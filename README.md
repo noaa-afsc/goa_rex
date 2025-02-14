@@ -1,6 +1,6 @@
 # GOA rex sole assessment documents and run configurations
 
-This is a repository containing supporting code, input files, and documents for the Gulf of Alaska rex sole stock assessment, created by Carey McGilliard
+This is a repository containing supporting code, input files, and documents for the Gulf of Alaska rex sole stock assessment, created and maintained by Carey McGilliard (@careymcgilliard)
 
 ## Collaborators
 
