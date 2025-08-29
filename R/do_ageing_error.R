@@ -30,4 +30,17 @@ rex_spc <- AgeingError::load_specs(file.path(mydir, "simple_age_error.spc"),
                                                   DataSpecs = rex_dat,
                                                   verbose = TRUE)
 
+rex_mod <- AgeingError::DoApplyAgeError(
+  Species = "rex",
+  DataSpecs = rex_dat,
+  ModelSpecsInp = rex_spc,
+  AprobWght = 1e-06,
+  SlopeWght = 0.01,
+  SaveDir = file.path(mydir,"results"),
+  verbose = FALSE
+)
 
+rex_out <- AgeingError::ProcessResults(Species = "rex", SaveDir = file.path(mydir,"results"), CalcEff = TRUE, verbose = FALSE)
+
+#this produces an ageing error matrix for each reader - what to do with that?
+# needs further examination of results and qaqc - might need some help with this.
