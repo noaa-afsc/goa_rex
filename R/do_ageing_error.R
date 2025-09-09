@@ -9,6 +9,45 @@ library(tidyverse)
 mydir<-"C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2025/ageing_error"
 adata<-readxl::read_excel(file.path(mydir,"rex_sole_goa_all_ages_survey_fishery_1992_to_2022.xlsx"),sheet = "data")
 
+pooled<-adata %>% select(read_age,test_age,reader_index,tester,collection_year) %>% drop_na() 
+pooled_new <-pooled %>% filter(collection_year>2008) %>% select(read_age,test_age)
+pooled_old <-pooled %>% filter(collection_year < 2008) %>% select(read_age,test_age)
+pooled_all <-pooled %>% select(read_age,test_age)
+
+#pooled all years analysis
+write_files(dat = pooled_all,dir = mydir, file_dat = "pooled_all_age_error.dat",file_specs = "pooled_all_age_error.spc",
+            minage = 0,refage = 12,plusage = 20)
+
+rex_dat <- AgeingError::load_data(file.path(mydir, "pooled_all_age_error.dat"),
+                                  NDataSet = 1,
+                                  verbose = TRUE, EchoFile = "pooled_all_age_error.out")
+
+rex_spc <- AgeingError::load_specs(file.path(mydir, "pooled_all_age_error.spc"),
+                                   DataSpecs = rex_dat,
+                                   verbose = TRUE)
+
+rex_mod <- AgeingError::DoApplyAgeError(
+  Species = "rex_pooled_all",
+  DataSpecs = rex_dat,
+  ModelSpecsInp = rex_spc,
+  AprobWght = 1e-06,
+  SlopeWght = 0.01,
+  SaveDir = file.path(mydir,"results"),
+  verbose = FALSE
+)
+
+rex_out <- AgeingError::ProcessResults(Species = "rex_pooled_all", SaveDir = file.path(mydir,"results"), CalcEff = TRUE, verbose = FALSE)
+
+#new years ageing error (cut-and-toast era)
+
+
+
+#old ageing error (pre-cut-and-toast era)
+
+
+
+
+#Analysis by reader
 simple<-adata %>% select(read_age,test_age,reader_index,tester) %>% drop_na() %>% mutate(pair = 1:nrow(simple))
 
 simple_reader<-simple %>% select(pair,read_age,reader_index)
