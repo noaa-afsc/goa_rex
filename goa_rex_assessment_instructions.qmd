@@ -7,18 +7,20 @@ editor: visual
 
 # GOA rex sole assessment instructions
 
-## Getting GOA rex sole assessment data
+## Obtaining GOA rex sole assessment data inputs
 
 The assessment uses the following data:
 
 ### Catch biomass
 
-  -  One area, as there is only fishing in the western-central GOA and nearly no fishing in the Eastern GOA.
+- One area, as there is only fishing in the western-central GOA and nearly no fishing in the Eastern GOA.
 
-    - Download directly from AKFIN Answers ([https://akfinbi.psmfc.org/](https://akfinbi.psmfc.org/bi-security-login/login.jsp?msi=false&redirect=L2FuYWx5dGljcy9zYXcuZGxsP2JpZWVob21lJnN0YXJ0UGFnZT0xJmhhc2g9Y0MtckpJLUVnQUhzUlBtMDM5TWZBamZxdkctT0oydlhlc0VON0h2azlyeFFOSlZRZkNMTVlHYWRNdXRTcmF1Wg==))
+```         
+- Download directly from AKFIN Answers ([https://akfinbi.psmfc.org/](https://akfinbi.psmfc.org/bi-security-login/login.jsp?msi=false&redirect=L2FuYWx5dGljcy9zYXcuZGxsP2JpZWVob21lJnN0YXJ0UGFnZT0xJmhhc2g9Y0MtckpJLUVnQUhzUlBtMDM5TWZBamZxdkctT0oydlhlc0VON0h2azlyeFFOSlZRZkNMTVlHYWRNdXRTcmF1Wg==))
 
-    - check boxes for both rex sole and GOA rex sole and grab all years, compare to the previous assessment.
-    
+  - check boxes for both rex sole and GOA rex sole and grab all years, compare to the previous assessment.
+```
+
 ### Fishery comp data
 
 - Fishery data are pulled using the goa_rex example in the sampler repo and include fishery age comp and fishery length comp
@@ -37,27 +39,37 @@ The assessment uses the following data:
 
 ### Survey Data
 
-  - For 2025/2026: see C:/GitProjects/pull_gap_products/examples/goa_rex.qmd which has the code used for pulling all of the survey data and comparing to the 2021 assessment
+- For 2025/2026: see C:/GitProjects/pull_gap_products/examples/goa_rex.qmd which has the code used for pulling all of the survey data and comparing to the 2021 assessment
 
-  - Before 2025 (much of this code will not work as it pre-dates gap_products):
+- Before 2025 (much of this code will not work as it pre-dates gap_products):
 
-    - Survey lengths: source("C:\\GitProjects\\newsbss\\Get_GOA_Survey_Length_and_Age_Comp\\Get_GOA_Length_Comps_by_Area.R")
+  - Survey lengths: source("C:\\GitProjects\\newsbss\\Get_GOA_Survey_Length_and_Age_Comp\\Get_GOA_Length_Comps_by_Area.R")
 
-    - Sample sizes for lengths and ages: source (for nsamp for survey lengths and for ages), by area (made with Wayne Palsson's help) source("C:\\GitProjects\\newsbss\\Get_GOA_Survey_Length_and_Age_Comp\\Get_Survey_Length_Age_Stats_By_Area.R")
+  - Sample sizes for lengths and ages: source (for nsamp for survey lengths and for ages), by area (made with Wayne Palsson's help) source("C:\\GitProjects\\newsbss\\Get_GOA_Survey_Length_and_Age_Comp\\Get_Survey_Length_Age_Stats_By_Area.R")
 
-    - Note that there are lines for reading in the data from .Rdata files, but below this are the queries for getting the data from SQL and then saving those same .Rdata files #This file also gets the number of hauls. #Don't forget to add in columns for ages that don't appear in the data - this isn't automated. #Run with #FmpArea = "600 and 699" #ByGear = 0 #ByPortOrHaul = 0 #LengthBins = seq(9,65,2) #AgeBins = seq(1,20,1)
+  - Note that there are lines for reading in the data from .Rdata files, but below this are the queries for getting the data from SQL and then saving those same .Rdata files #This file also gets the number of hauls. #Don't forget to add in columns for ages that don't appear in the data - this isn't automated. #Run with #FmpArea = "600 and 699" #ByGear = 0 #ByPortOrHaul = 0 #LengthBins = seq(9,65,2) #AgeBins = seq(1,20,1)
 
-    - Survey conditional age-at-lengths #do the SQL query and write the data necessary to read in to the next step here (which will also plot a bunch of age-length ggplots): source("C:\\GitProjects\\newsbss\\Inputs_PieceByPiece\\Get_GOA_Survey_Length_and_Age_Comp\\Get_Survey_Length_Age_and_Plot.R")
+  - Survey conditional age-at-lengths #do the SQL query and write the data necessary to read in to the next step here (which will also plot a bunch of age-length ggplots): source("C:\\GitProjects\\newsbss\\Inputs_PieceByPiece\\Get_GOA_Survey_Length_and_Age_Comp\\Get_Survey_Length_Age_and_Plot.R")
 
-    - Run this to get the conditional age-at-length data roughly formatted for assessment input source("C:\\GitProjects\\newsbss\\Inputs_PieceByPiece\\Get_GOA_Survey_Length_and_Age_Comp\\GET_GOA_CONDITIONAL_AGE_AT_LENGTH.R") #run it for "eastern" and for "noneastern" separately #len_bins = seq(9,65,2) #max_age = 20 #eastern = "eastern" then do eastern = "noneastern" #default is 0
+  - Run this to get the conditional age-at-length data roughly formatted for assessment input source("C:\\GitProjects\\newsbss\\Inputs_PieceByPiece\\Get_GOA_Survey_Length_and_Age_Comp\\GET_GOA_CONDITIONAL_AGE_AT_LENGTH.R") #run it for "eastern" and for "noneastern" separately #len_bins = seq(9,65,2) #max_age = 20 #eastern = "eastern" then do eastern = "noneastern" #default is 0
 
-    - GOA marginal age comps were tricky because they are not produced by the survey group by area (or by Western-Central and Eastern), otherwise they would be included as ghost comps. (Pete and Ben were trying to resolve this after 2021 using area-specific age-length keys for afscISS and surveyISS. However, I couldn't get their caal data to match mine without any bootstrapping in 2025/2026)
+  - GOA marginal age comps were tricky because they are not produced by the survey group by area (or by Western-Central and Eastern), otherwise they would be included as ghost comps. (Pete and Ben were trying to resolve this after 2021 using area-specific age-length keys for afscISS and surveyISS. However, I couldn't get their caal data to match mine without any bootstrapping in 2025/2026)
 
 ## Running the ss3 assessment model and producing model plots
 
+This uses the newsbss repo (which used to also be used for data inputs but is not anymore). r4ss is run here: C:/GitProjects/newsbss/Process_SS_Output/SS3toProjectTables.R. Update the fields at the top. This messy code does the following:
 
+- runs r4ss
 
+- makes r4ss plots
 
+- makes additional plots
+
+- calculates updated data weighting
+
+- writes some parameter tables for the document (just simple .csv files)
+
+- writes the data files for doing projections
 
 ## Projections
 
