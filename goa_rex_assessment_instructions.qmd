@@ -7,6 +7,40 @@ editor: visual
 
 # GOA rex sole assessment instructions
 
+## Read in libraries
+
+```{r}
+
+library(devtools)
+devtools::install_github("afsc-assessments/afscISS")
+
+#library(devtools)
+#devtools::install_github("BenWilliams-NOAA/surveyISS")
+install.packages("C:/GitProjects/surveyISS", repos = NULL, type = "source")
+
+devtools::install_github("careymcg/AreaGrowthRex")
+
+
+if (!requireNamespace("pacman", quietly = TRUE)) {
+  install.packages("pacman")
+}
+
+newlibs <-c('r4ss',
+            'dplyr',
+            'tidyr',
+            'here',
+            'ggplot2',
+            'keyring',
+            'DBI',
+            'odbc',
+            'afscISS',
+            'surveyISS',
+            'ggplot2',
+            'AreaGrowthRex')
+
+pacman::p_load(char = newlibs) #load packages
+```
+
 ## Obtaining GOA rex sole assessment data inputs
 
 The assessment uses the following data:
@@ -23,19 +57,96 @@ The assessment uses the following data:
 
 ### Fishery comp data
 
-- Fishery data are pulled using the goa_rex example in the sampler repo and include fishery age comp and fishery length comp
+####Fishery age comps and sample sizes
 
-- Plan is to update fishery sample size methods when Pete's new repo for processing fishery data is done, which is post-2026 assessment
+- Fishery age data are pulled using the goa_rex case in the sampler repo: <https://github.com/afsc-assessments/sampler/blob/main/cases/rex/call_sampler_rex.R>
 
-- To do for 2026: write query in the sampler repo to pull the sample sizes for the observer data if they are not output from sampler
+  - I used the ADMB code (not the R refactor) for the 2026 assessment
 
-- Before 2025:
+  - I did 1000 bootstraps
 
-  - Fishery ages: (this was a criticism of the CIE review - it uses raw lengths rather than extrapolated lengths to include the port data): source("C:\\GitProjects\\newsbss\\Inputs_PieceByPiece\\Get_Fishery_Ages\\Get_Fishery_Ages_Port_or_Haul_noStratifying_noExtrapLens.R")
+  - I could not get sampler to run for the 1992 data, and instead kept the historical data for that year. Although there is 1 haul in that year and it is mostly port data, the same is true for 1995, which does run. The problem would require debugging in the sam.tpl file, as it outputs 0s for age comps.
 
-  - Fishery lengths: Before 2025 these came from: source("C:\\GitProjects\\newsbss\\Get_Fishery_Lengths\\Get_Fishery_Lengths_With_Extrapolated_Number.R")
+  - The input sample size for the fishery age data is equal to the number of hauls where ages were collected. There are some years with port data. In 2017 when the fishery age data were incorporated, I found that the historical average number of hauls in a port sample was equal to 9, and this is where the calculation for sample size comes from: it is the number of hauls +9\*(number of port samples), and I calculate this in <https://github.com/afsc-assessments/sampler/blob/main/cases/rex/call_sampler_rex.R>, and it is then merged with the age comp for a final formatted age comp output file catagesex.csv.
 
-  - Sample size (Nsamp) for Fishery lengths (and tables for the SAFE): update directories and source: source("C:\\GitProjects\\newsbss\\Get_Fishery_Lengths\\Get_Fishery_Length_HaulStats_With_NORPAQ.R")
+#### Fishery length comps
+
+Fishery length composition data are calculated and formatted using the embarrassingly ancient repo newsbss: https://github.com/careymcg/newsbss
+
+The file used is: https://github.com/careymcg/newsbss/blob/master/Inputs_PieceByPiece/Get_Fishery_Lengths/Get_Fishery_Lengths_With_Extrapolated_Number.R
+
+The code pre-dates dplyr!! What a dinosaur! The main piece of code calls functions from this folder: https://github.com/careymcg/newsbss/tree/master/FUNCTIONS
+
+The following specifications are needed and are typically entered in the code pieces mentioned below:
+
+```{r}
+
+DataDir = "C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2026/goa_rex/data/"
+dir.create(file.path(DataDir,"Fishery_Lengths"))
+
+len_bins<-seq(from = 9, to = 65, by = 2)
+
+Unsexed = 0 # 1 or 2 (0 = don't include them in comps, 
+                     #1 = include unsexed fish in the comps by fraction of m:f in pop
+                     #2 = include unsexed fish in the comps as 50% male 50% female
+
+
+SpeciesCode = "105" #Flathead sole only = 103, Rex = 105, Dover = 107, Bering flounder = 145, GT = 102, Deepsea sole = 110
+
+#GearPerformance: 1 = no problem. however, probably want all gear performances for obs. data for true selex.
+
+#Potentially unbury the choices for FmpArea for max flexibility.
+FmpArea = "'GOA'" #Options are 'AI' = 539-544 'GOA' = 600 to 699 'BS' = 500 to 539
+#Gear = 1 #For Bering Sea FHS, it's just non-pelagic trawl = 1
+
+# length bins to use for fsh and srv length comp data
+bin_width <- 2
+min_size <- 9  #9 = Rex #6 = Dover
+max_size <- 65
+```
+
+There is a separate piece of code for getting the sample sizes: https://github.com/careymcg/newsbss/blob/master/Inputs_PieceByPiece/Get_Fishery_Lengths/Get_Fishery_Length_HaulStats_With_NORPAQ.R
+
+Below are the right specifications for rex sole for the file used for getting the number of hauls for which there are length samples. The code used for getting this info (which is used as sample size for the fishery length comps in the assesmsent input) is:
+
+```{r}
+OutDir = "C:\\Users\\carey.mcgilliard\\Work\\FlatfishAssessments\\2026\\goa_rex\\data\\Fishery_Lengths\\"
+
+#
+#Flathead sole only = 103, Rex = 105, Dover = 107, Bering flounder = 145, GT = 102, Deepsea sole = 110
+#NMFS_AREA between 500 and 544 for BSAI, above 600 for GOA
+species = 105
+low.nmfs.area = "'600'" #"'600'" #500 
+hi.nmfs.area = "'699'" #"'699'"  #544
+gear = "all" #"nonpelagic" #"pelagic" #"all"
+with_unsexed = F #T
+```
+
+Then I read in the output generated by the dinosaur code to format the length comps for ss3, as follows. Note that previous assessments have left out years with low nhauls and I opted to leave these in as they should not impact the objective function much if the number of hauls is very low. I will just list the iss on the plots coming out of r4ss.
+
+```{r}
+fishery_lengths<-read.csv(file.path(OutDir,"Observer_Length_Comps.csv")) |>
+  dplyr::select(-c(X)) |>
+  dplyr::rename(year = YEAR)
+
+fishery_lengths_ss3<-read.csv(file.path(OutDir,"Num_Hauls_ForAndDom_Fishery_AllGears_w_unsexed_FALSE.csv")) |>
+  dplyr::select(year,nhauls_tot) |>
+  dplyr::right_join(fishery_lengths) |>
+  dplyr::rename(nhauls = nhauls_tot) |>
+  dplyr::mutate(month = 7, fleet = 1,sex = 3, part = 0) |>
+  dplyr::relocate(year, month, fleet, sex, part, nhauls) |>
+  tidyr:: drop_na(nhauls) |>
+  dplyr::arrange(year) 
+
+write.csv(fishery_lengths_ss3,file = file.path(OutDir,"fishery_lengths_ss3_fmt.csv"))
+
+```
+
+#### Side notes about fishery data
+
+My plan was to update fishery sample size methods when Pete's new repo for processing fishery data is done, which is post-2026 assessment, hence the ancient code that I have not made an effort to update (it seems to still work!)
+
+- *Method used to get fishery ages before 2025 and is no longer used - the method was criticized in a CIE review - it uses raw lengths rather than extrapolated lengths to include the port data): source("C:\\GitProjects\\newsbss\\Inputs_PieceByPiece\\Get_Fishery_Ages\\Get_Fishery_Ages_Port_or_Haul_noStratifying_noExtrapLens.R")*
 
 ### Survey Data
 
@@ -54,6 +165,11 @@ The assessment uses the following data:
   - Run this to get the conditional age-at-length data roughly formatted for assessment input source("C:\\GitProjects\\newsbss\\Inputs_PieceByPiece\\Get_GOA_Survey_Length_and_Age_Comp\\GET_GOA_CONDITIONAL_AGE_AT_LENGTH.R") #run it for "eastern" and for "noneastern" separately #len_bins = seq(9,65,2) #max_age = 20 #eastern = "eastern" then do eastern = "noneastern" #default is 0
 
   - GOA marginal age comps were tricky because they are not produced by the survey group by area (or by Western-Central and Eastern), otherwise they would be included as ghost comps. (Pete and Ben were trying to resolve this after 2021 using area-specific age-length keys for afscISS and surveyISS. However, I couldn't get their caal data to match mine without any bootstrapping in 2025/2026)
+## Configuration notes for ss3 model runs
+- the last year of recruitment estimated in the ctl file is typically current year minus 3. In 2026 I set it to current year minus 4 because there was no GOA survey in 2026. Typically rex sole assessments are done in years with GOA data, but this year that is not the case because we never completed the assessment in 2025 due to the October 2025 government shutdown  
+- I set the ages included in summary biomass in the starter file to 3 because this is what is reported in the executive summary table. This makes it easier to produce the time series table for total biomass with consistency between ss3 and spm  
+- I never bothered to do projections in ss3. I have always used spm and suspect that this model will move to sporc soon, so I didn't do it this year either. A problem for the NPFMC management quantities and ss3 occurs if steepness <1. Here steepness = 1 (for now), but this could be explored. We have to use SPR-based reference points and biomass reference points use SBPR*average recruitment, with recruitment as a true average of the estimates, while ss3 assumes that this is average is the mean stock-recruit curve.  
+
 
 ## Running the ss3 assessment model and producing model plots
 
@@ -71,7 +187,197 @@ This uses the newsbss repo (which used to also be used for data inputs but is no
 
 - writes the data files for doing projections
 
+I am copying in SS3toProjectTables.R to this document to convert it to .qmd
+
+The following relies heavily on r4ss. I did not update r4ss in Aug/Sept 2026, as I heard that functions for doing retrospectives were not working. I repeatedly run the code below, entering various run folder names, then when I pick a base model, I continue past the data weighting chunk to plot things. The file "C:\Users\carey.mcgilliard\Work\FlatfishAssessments\\2026\goa\_rex\runs\GOA\_rex_2026_run_tracker.xlsx" has the run folder names and a description of each run. The way this is left is that the base model is MyRun and SS3PredDir.
+
+### Set up plotting themes for manuscript and presentation
+```{r plotting themes, include=FALSE}
+
+# Presentation theme
+.THEME <- theme(panel.grid.major.x = element_blank(), panel.grid.minor.y = element_blank(), panel.grid.major.y = element_blank() )
+.THEME <- .THEME + theme(text=element_text(size=18)) + theme(axis.title.x=element_text(size=24) ,axis.title.y=element_text(size=24, angle = 90,vjust = +2)) +
+theme(legend.position = "bottom")
+theme_set(.THEME)
+#.THEME <- .THEME + theme( panel.background = element_rect(fill="white"), #panel.border = element_rect(colour="black", fill=NA, size=1))
+
+# Manuscript theme
+.THEME <- theme(panel.grid.major.x = element_blank(), panel.grid.minor.y = element_blank(), panel.grid.major.y = element_blank() )
+.THEME <- .THEME + theme(text=element_text(size=12)) + theme(axis.title.x=element_text(size=12) ,axis.title.y=element_text(size=12, angle = 90,vjust = +2)) +
+theme(legend.position = "bottom")
+theme_set(.THEME)
+```
+
+### Make all of the single-run r4ss plots
+```{r r4ss_plots}
+
+windows(record = T)
+par(mfrow = c(1,1),cex.axis = 1.8, cex.lab = 1.8,lwd = 3,omi =c(0.3,0.1,0.3,0.3), mai = c(1.02,1,0.82,0.42),bty = "l")
+
+species = "Rex"#"Halibut" #BSAI_flats #Dover #"Flathead" "Rex" 
+run_dir<-"C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2026/goa_rex/runs"
+the_run <- "run_19_as_for_18_includes_ageerr"
+
+SS3PredDir = file.path(run_dir,the_run)
+setwd(SS3PredDir) #this ends at the end of the chunk
+
+previous_assess_dir<-"C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2021/Rex/Runs"
+WorkDir = "C:/Users/carey.mcgilliard/Work/"
+CodeDir = "C:/GitProjects/newsbss/"
+
+Uncertainty = T #make r4ss plots with or without uncertainty plotted
+FirstYr = 1982 #This is important later for projections and the phase plot.
+LastYr = 2026 #LastYr is the last year included in the ss3 model
+RecruitmentAge = 3 #RecruitmentAge is the age of recruitment for projections, which are done using the spmR repo
+NagesProject = 20 #NagesProject is the plus group age for projections, which is the same as the plus group in ss3
+
+#r4ss, basic plot file, bias adjustment, and Francis lambdas
+
+MyOutput = SS_output(dir = SS3PredDir,covar = Uncertainty,forecast=TRUE,printstats=FALSE)
+
+SS_plots(replist = MyOutput,uncertainty=Uncertainty) 
+
+SSplotPars(replist = MyOutput,showpost = F,fitrange = T, nrow = 8,ncol = 4,pheight= 8,pwidth = 8)
+dev.copy(pdf,'plots/SSplotPars.pdf')
+dev.off()
+```
+
+Make the working directory for saving things SS3PredDir until further notice
+```{r change_wd_to_current_run}
+#| label: setup
+#| include: false
+knitr::opts_knit$set(root.dir = SS3PredDir)
+```
+
+### Calculate changes in data weighting. 
+The models (except for a sensitivity analysis) use Francis weighting.
+
+```{r data_weighting}
+
+ Francis <-tune_comps(replist=MyOutput, fleets = "all", option = "Francis",digits = 2,write = TRUE)
+# MI<-SS_tune_comps(replist=MyOutput, fleets = "all", option = "MI", digits = 6, write = TRUE)
+
+```
+
+### Make comparison plots
+I use and made the R package AreaGrowthRex, originally for a manuscript. It makes nicer comparison plots than r4ss and includes plots of fits to age-length data, as well as maturity-at-age overlaid on selectivity plots.
+
+I updated the 2021 accepted run to use the newest version of ss3 for these plots as the number of columns in the report.sso catch section differs between versions.
+
+####Organize runs for comparison
+```{r readfiles, include = FALSE, message = FALSE, warning = FALSE}
+compare_dir<-file.path(run_dir,"comparison_plots")
+if (!dir.exists(compare_dir)) {
+  dir.create(compare_dir, recursive = TRUE)
+}
+run_2021 <-file.path(run_dir,"run_2021_accepted_new_ss3v")
+run_17 <- file.path(run_dir,"run_17_asfor7_newdata_excludes_2025_caal")
+run_18 <- file.path(run_dir,"run_18_as_for_17_newdata_includes_2025_caal")
+run_base<- file.path(run_dir,"run_19_as_for_18_includes_ageerr")
+
+label_2021<-"2021 accepted"
+label_17 <- "new data excludes 2025 caal"
+label_18 <- "new data"
+label_base <-"base model"
+
+the_run_labels <-c(label_2021,label_17,label_18,label_base)
+
+the_run_list<-r4ss::SSgetoutput(dirvec = c(run_2021,run_17,run_18,run_base),getcomp = TRUE, getcovar = TRUE)
+
+#SummaryList<-r4ss::SSsummarize(MasterList)
+```
+
+#### Make comparison plots
+Notes: spr is reported as raw SPR in starter files. Last year of recruitment estimates is current year -3 (consistent with long life in the plankton), but in 2026 we have no survey, the last survey was 2025, so set to current year -4.
+```{r plot estimated pop dynamics, echo = FALSE, message = FALSE, warning = FALSE, fig.cap = "Figure 6. Observed catches and estimated spawning biomass, recruitment, and fishing intensity (1-spawning potential ratio) for each of the four alternative models with new data added"}
+
+
+#need to make y-axis on ssb go to zero
+ssbplot<-AreaGrowthRex::plot_ssbs(ssruns=the_run_list,mlabel=the_run_labels,showxlabel =   FALSE,showlegend = "none",color_option = "cividis",color_direction =-1)
+
+recplot<-AreaGrowthRex::plot_recs(ssruns = the_run_list,mlabel = the_run_labels,showxlabel = FALSE,showlegend = "none",color_option = "cividis",color_direction = -1)
+
+
+fi_plot<-AreaGrowthRex::plot_one_minus_spr(ssruns = the_run_list,mlabel = the_run_labels,showxlabel = FALSE,showlegend = "yes",color_option = "cividis",color_direction = -1)
+
+#stuff<-get_catch_data(ssruns = MasterList,mlabel = Mlabels)
+total_catch_plot<-AreaGrowthRex::plot_total_catch(ssruns = the_run_list,mlabel = the_run_labels,showxlabel = TRUE,showlegend = "none")
+
+#from library(patchwork)
+bigfig<-(total_catch_plot/ssbplot/recplot/fi_plot)
+
+ggplot2::ggsave(filename = file.path(compare_dir,paste0("compare_time_series.png")),device = "png",width = 8.5,height = 11)
+
+bigfig
+```
+
+
+
+#-------------------------------------------------------------------- if (species=="Rex") { #for Rex: plot comparison of maturity curve and selex \# a50\<-5.62298 \# a95\<-10.3917 \# avec\<-3:20
+
+m.df\<-read.csv(file.path(WorkDir,"FlatfishAssessments","2017","Rex","Data","Maturity_At_Age_Buck.csv")) #m.df$est<-1/(1+exp(-log(19)/(a95-a50)*(avec-a50)))
+#stock synthesis selectivity:
+stuff<-MyOutput$ageselex\[MyOutput$ageselex$Factor == "Asel" & MyOutput$ageselex$Yr == 2021 & MyOutput$ageselex$Sex == 1 & MyOutput$ageselex$Fleet == 1,\] stuff2\<-stuff\[,-c(1:7)\] s.df\<-data.frame(Age = as.numeric(colnames(stuff2)), Sel = as.numeric(stuff2))
+
+plot(0,0,type = "n",bty = "l", xlim = c(0,max(s.df$Age)),ylim = c(0,1),xlab = "Age", ylab = "Proportion")
+lines(m.df$Age,m.df$Maturity,lwd = 3, lty = 1, col = "cadetblue")
+lines(s.df$Age,s.df\$Sel,lwd = 3, lty = 2, col = "black") legend(x = 13, y = 0.4,legend = c("Maturity","Selectivity (F)"),bty = "n",col = c("cadetblue","black"),lwd = c(3,3), lty = c(1,2))
+
+#save to same folder as for SS plots dev.copy(png,paste0(SS3PredDir,"Maturity_Selex.png")) dev.off() #--------------------------------------------------------------------- source(file.path(CodeDir,"Process_SS_Output","PlotMultipleGrowthMorphs.R")) #save to same folder as for SS plots PlotGrowth(DataDir = file.path(WorkDir,"FlatfishAssessments/2021/Rex/Data/Survey_Age_Length"),AgeLengthData = "Age_Length.csv")
+
+dev.copy(png,file.path(SS3PredDir,"plots","Growth_Curves.png")) dev.off()
+
+} #end if species=="Rex" #------------------------------------------------------------------------------ #check this plotting code - is this plotting dover age-lengths?? if (MyOutput\$ngpatterns == 1) { source(file.path(CodeDir,"Process_SS_Output","PlotSingleGrowthMorphGrowthCurve_And_Data.R")) #this line doesn't work - try C drive instead: dev.copy(png,paste0(redirect,"FlatfishAssessments\\",LastYr,"\\",species,"\\",SS3Folder,"Single_Morph_Growth_Curves.png")) dev.copy(png, "C:\\Data\\Single_Morph_Growth_Curves.png") dev.off() }
+
+#-------------------------------------------------------------------- \# #Tables of param values for a single run (also is with Time_Series_Param_Tables_2_Growth_Morphs.R):
+
+p1.df\<-data.frame(Label = MyOutput$parameters$Label, Value = MyOutput$parameters$Value, Phase = MyOutput$parameters$Phase, StDev = MyOutput$parameters$Parm_StDev)
+
+EstP.df\<-na.omit(p1.df\[p1.df\$Phase \>0,\])
+
+RecPars.df\<-data.frame(type = MyOutput$recruitpars$type, Yr = MyOutput$recruitpars$Yr, Value = MyOutput$recruitpars$Value, StDev = MyOutput$recruitpars$Parm_StDev)
+
+write.csv(RecPars.df,file = paste0(SS3PredDir,"RecPars.csv")) write.csv(EstP.df,file = paste0(SS3PredDir,"Main_Pars.csv")) #easiest with fishing mortality to copy and paste straight from the report file.
+
+#-----------------------------------------------------------------------------
+
+#--------------------------------------------------------------------- #BiasA = SS_fitbiasramp(replist = MyOutput) #Maybe write this to a file? #BiasA #------------------------------------------------------------
+
+#------------------------------------------------------------- #------------------------------------------------------------- #Do projections: #Write out the main projection input file #-------------------------------------------------------------- #before 2017: #source(paste0(redirect,"ProjectionModel\_",LastYr,"\\write_proj_ss_CRM_Dover.r"))
+
+#starting in 2017: #careful: this doesn't work with empirical weight-at-age output; need to manually insert maturity-at-age.
+
+if (species == "Rex" & MyOutput\$ngpatterns \> 1) { #NOTE: NAME ALL DATA FILES STARTING WITH "ForProjections" source(file.path(CodeDir,"Projections","write_proj_ss_CRM_2_growth_morphs.r")) write_proj(data_file=file.path(SS3PredDir,"ForProjections_GrowthMorph1.dat"),data=MyOutput,GrowthMorph=1,area =1,Narea = 2,Nmorph = 2,NAGES=NagesProject,FY=FirstYr,LY=LastYr,RecAge = RecruitmentAge,species = species) write_proj(data_file=file.path(SS3PredDir,"ForProjections_GrowthMorph2.dat"),data=MyOutput,GrowthMorph=2,area =2,Narea = 2,Nmorph = 2,NAGES=NagesProject,FY=FirstYr,LY=LastYr,RecAge = RecruitmentAge,species = species)
+
+} else { #NOTE: NAME ALL DATA FILES STARTING WITH "ForProjections" source(file.path(CodeDir,"Projections","write_proj_ss_CRM.r")) write_proj(data_file=file.path(SS3PredDir,"ForProjections.dat"),data=MyOutput,NAGES=NagesProject,FY=FirstYr,LY=LastYr,RecAge = RecruitmentAge,species = species)
+
+}
+
+#---------------------------------------------------------------------------- #Write a .bat file to run projections within a Projections folder within the run folder #This is handy if running projections for many runs. Otherwise maybe not worth it. #First need to go to FlatfishAssessments/Projections/RexTemplate and update all the files for the current year, including pulling any updates to main.tpl and recompiling. setwd(paste0(SS3PredDir)) data_file = "OrgProjections.bat" #line0\<-noquote(redirect) #write(line0,paste(data_file),ncolumns = 1) line1a\<-noquote(paste0("cd ",'"',SS3PredDir,'"')) write(line1a,paste(data_file),ncolumns = 1) \# myline \<- noquote("mkdir Projections\\data") \# write(myline,paste(data_file),ncolumns = 1, append = T)
+
+if (MyOutput\$ngpatterns ==2) { #NGrowthMorphs \>1 myline \<- noquote("mkdir Projections") write(myline,paste(data_file),ncolumns = 1, append = T)
+
+line2 \<-noquote(paste0("copy ",'"',WorkDir,"\\FlatfishAssessments\\ProjectionModel\\RexTemplate\\GrowthMorph1",'" "',SS3PredDir,"\\Projections\\GrowthMorph1",'"')) line2b \<-noquote(paste0("copy ",'"',WorkDir,"\\FlatfishAssessments\\ProjectionModel\\RexTemplate\\GrowthMorph2",'" "',SS3PredDir,"\\Projections\\GrowthMorph2",'"'))
+
+\# line2b \<-noquote(paste0("copy ",'"',WorkDir,"\\FlatfishAssessments\\ProjectionModel\\RexRunTemplate\\",'" "',SS3PredDir,"Projections\\GrowthMorph2",'"')) write(line2,paste(data_file),ncolumns =1,append = T ) write(line2b,paste(data_file),ncolumns =1,append = T )
+
+myline \<- noquote("mkdir Projections\\GrowthMorph1\\data") write(myline,paste(data_file),ncolumns = 1, append = T) myline2 \<- noquote("mkdir Projections\\GrowthMorph2\\data") write(myline2,paste(data_file),ncolumns = 1, append = T)
+
+line3\<-noquote(paste0("copy ForProjections_GrowthMorph1.dat ",'"',SS3PredDir,"\\Projections\\GrowthMorph1\\data\\ForProjections.dat",'"')) line3b\<-noquote(paste0("copy ForProjections_GrowthMorph2.dat ",'"',SS3PredDir,"\\Projections\\GrowthMorph2\\data\\ForProjections.dat",'"')) write(line3,paste(data_file),ncolumns =1,append = T ) write(line3b,paste(data_file),ncolumns =1,append = T )
+
+line4\<-noquote("cd Projections\\GrowthMorph1\\") write(line4,paste(data_file),ncolumns =1,append = T ) line5\<-noquote("main") write(line5,paste(data_file),ncolumns =1,append = T )
+
+preline\<-noquote("cd..") write(preline,paste(data_file),ncolumns =1,append = T ) line4b\<-noquote("cd GrowthMorph2\\") write(line4b,paste(data_file),ncolumns =1,append = T ) line5b\<-noquote("main") write(line5b,paste(data_file),ncolumns =1,append = T ) }
+
+if (MyOutput\$ngpatterns == 1) { myline \<- noquote("mkdir Projections\\data") write(myline,paste(data_file),ncolumns = 1, append = T) line2 \<-noquote(paste0("copy ",'"',redirect,"\\FlatfishAssessments\\",LastYr,"\\ProjectionModel\\",species,"RunTemplate\\",'" "',SS3PredDir,"Projections",'"'))
+
+write(line2,paste(data_file),ncolumns =1,append = T ) line3\<-noquote(paste0("copy ForProjections\* ",'"',SS3PredDir,"Projections\\data\\ForProjections.dat",'"')) write(line3,paste(data_file),ncolumns =1,append = T ) line4\<-noquote("cd Projections") write(line4,paste(data_file),ncolumns =1,append = T ) line5\<-noquote("main") write(line5,paste(data_file),ncolumns =1,append = T ) } #if NGrowthMorphs == 1 #\*\*\*\*RUN PROJECTIONS\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\* shell("OrgProjections")
+
+\`\`\`
+
 ## Projections
+
+From ss3toProjecctTables: #CAUTION: for a 2-growth morph model a little help is needed for GP2 projections (GP1 projections are good): #you have to manually copy in the correct .dat file for the projections and change the sppcatch file to the correct GP2 catches
 
 #Before running the projection part of the code below do 2 manual steps: #1. update AK-projection-simulation repo (pull updates) #2. update the projection input files aside from the main (ForProjections) data file (these are in: #C:\Users\carey.mcgilliard\Work\FlatfishAssessments\ProjectionModel\RexTemplate) #Updating requires updated catches and updating the number of years of projections (14 for a full assessment year with a new data) and new catches and check \# years of catches input in proj input files #Probably worthwhile to check into whether it's better to run Jim's R code in AK-projection-simulation repo?? but the code below is for SS output) #Carey can never get Jim's newest projection code to run.
 
@@ -82,20 +388,3 @@ This uses the newsbss repo (which used to also be used for data inputs but is no
 #To run retrospectives: #Make a new folder (Like Run_8_Retro), run the following (and this will plot the retros too): #change file paths and run folders source("C:\\GitProjects\\newsbss\\Process_SS_Output\\RunRetrospectives.R")
 
 #Compare any alternative runs using: #change file paths and run folders source("C:\\GitProjects\\newsbss\\Process_SS_Output\\CompareSS3Runs.R")
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
-
-```{r}
-1 + 1
-```
-
-You can add options to executable code like this
-
-```{r}
-#| echo: false
-2 * 2
-```
-
-The `echo: false` option disables the printing of code (only output is displayed).
