@@ -36,7 +36,9 @@ newlibs <-c('r4ss',
             'afscISS',
             'surveyISS',
             'ggplot2',
-            'AreaGrowthRex')
+            'AreaGrowthRex',
+            'patchwork',
+            'future')
 
 pacman::p_load(char = newlibs) #load packages
 ```
@@ -164,16 +166,17 @@ My plan was to update fishery sample size methods when Pete's new repo for proce
 
   - Run this to get the conditional age-at-length data roughly formatted for assessment input source("C:\\GitProjects\\newsbss\\Inputs_PieceByPiece\\Get_GOA_Survey_Length_and_Age_Comp\\GET_GOA_CONDITIONAL_AGE_AT_LENGTH.R") #run it for "eastern" and for "noneastern" separately #len_bins = seq(9,65,2) #max_age = 20 #eastern = "eastern" then do eastern = "noneastern" #default is 0
 
-  - GOA marginal age comps were tricky because they are not produced by the survey group by area (or by Western-Central and Eastern), otherwise they would be included as ghost comps. (Pete and Ben were trying to resolve this after 2021 using area-specific age-length keys for afscISS and surveyISS. However, I couldn't get their caal data to match mine without any bootstrapping in 2025/2026)
-## Configuration notes for ss3 model runs
-- the last year of recruitment estimated in the ctl file is typically current year minus 3. In 2026 I set it to current year minus 4 because there was no GOA survey in 2026. Typically rex sole assessments are done in years with GOA data, but this year that is not the case because we never completed the assessment in 2025 due to the October 2025 government shutdown  
-- I set the ages included in summary biomass in the starter file to 3 because this is what is reported in the executive summary table. This makes it easier to produce the time series table for total biomass with consistency between ss3 and spm  
-- I never bothered to do projections in ss3. I have always used spm and suspect that this model will move to sporc soon, so I didn't do it this year either. A problem for the NPFMC management quantities and ss3 occurs if steepness <1. Here steepness = 1 (for now), but this could be explored. We have to use SPR-based reference points and biomass reference points use SBPR*average recruitment, with recruitment as a true average of the estimates, while ss3 assumes that this is average is the mean stock-recruit curve.  
+  - GOA marginal age comps were tricky because they are not produced by the survey group by area (or by Western-Central and Eastern), otherwise they would be included as ghost comps. (Pete and Ben were trying to resolve this after 2021 using area-specific age-length keys for afscISS and surveyISS. However, I couldn't get their caal data to match mine without any bootstrapping in 2025/2026) \## Configuration notes for ss3 model runs
 
+- the last year of recruitment estimated in the ctl file is typically current year minus 3. In 2026 I set it to current year minus 4 because there was no GOA survey in 2026. Typically rex sole assessments are done in years with GOA data, but this year that is not the case because we never completed the assessment in 2025 due to the October 2025 government shutdown\
+
+- I set the ages included in summary biomass in the starter file to 3 because this is what is reported in the executive summary table. This makes it easier to produce the time series table for total biomass with consistency between ss3 and spm\
+
+- I never bothered to do projections in ss3. I have always used spm and suspect that this model will move to sporc soon, so I didn't do it this year either. A problem for the NPFMC management quantities and ss3 occurs if steepness \<1. Here steepness = 1 (for now), but this could be explored. We have to use SPR-based reference points and biomass reference points use SBPR\*average recruitment, with recruitment as a true average of the estimates, while ss3 assumes that this is average is the mean stock-recruit curve.
 
 ## Running the ss3 assessment model and producing model plots
 
-This uses the newsbss repo (which used to also be used for data inputs but is not anymore). r4ss is run here: C:/GitProjects/newsbss/Process_SS_Output/SS3toProjectTables.R. Update the fields at the top. This messy code does the following:
+This used to use the newsbss repo and I'm not sure yet if I'm still dependent on this repo, as now I have the AreaGrowthRex package that I made. newsbss used to also be used for data inputs but is not anymore). r4ss is run here: C:/GitProjects/newsbss/Process_SS_Output/SS3toProjectTables.R. Update the fields at the top. This messy code does the following:
 
 - runs r4ss
 
@@ -191,7 +194,15 @@ I am copying in SS3toProjectTables.R to this document to convert it to .qmd
 
 The following relies heavily on r4ss. I did not update r4ss in Aug/Sept 2026, as I heard that functions for doing retrospectives were not working. I repeatedly run the code below, entering various run folder names, then when I pick a base model, I continue past the data weighting chunk to plot things. The file "C:\Users\carey.mcgilliard\Work\FlatfishAssessments\\2026\goa\_rex\runs\GOA\_rex_2026_run_tracker.xlsx" has the run folder names and a description of each run. The way this is left is that the base model is MyRun and SS3PredDir.
 
+### 2026 model run notes
+
+- spr is reported as raw SPR in starter files.\
+- Last year of recruitment estimates is current year -3 (consistent with long life in the plankton), but in 2026 we have no survey, the last survey was 2025, so set to current year -4.\
+- there were no fishery ages aged yet for 2025\
+- The caal for 2025 was tough to get because the ages came the week before the assessment was due and the values for regulatory area used the NMFS definition instead of the INPFC definition used for previous years, and because my re-written code in pull_gap_products did not match that from the special wc and e caal case from surveyISS (and therefore afscISS, which still needs to be worked out)
+
 ### Set up plotting themes for manuscript and presentation
+
 ```{r plotting themes, include=FALSE}
 
 # Presentation theme
@@ -208,7 +219,8 @@ theme(legend.position = "bottom")
 theme_set(.THEME)
 ```
 
-### Make all of the single-run r4ss plots
+### Make the single-run r4ss plots for relevant runs
+
 ```{r r4ss_plots}
 
 windows(record = T)
@@ -243,13 +255,15 @@ dev.off()
 ```
 
 Make the working directory for saving things SS3PredDir until further notice
+
 ```{r change_wd_to_current_run}
 #| label: setup
 #| include: false
 knitr::opts_knit$set(root.dir = SS3PredDir)
 ```
 
-### Calculate changes in data weighting. 
+### Calculate changes in data weighting.
+
 The models (except for a sensitivity analysis) use Francis weighting.
 
 ```{r data_weighting}
@@ -259,12 +273,80 @@ The models (except for a sensitivity analysis) use Francis weighting.
 
 ```
 
-### Make comparison plots
+## Jitter analysis
+
+The jitter analysis starts with a jitter fraction of 0.1 and 100 runs. - Convergence Check: If only a tiny fraction (e.g. less than 5 percent) of runs find the lowest likelihood, your model may be highly unstable.\
+- Global vs. Local: If many runs find a likelihood lower than your original base model, your original model was stuck in a local minimum. You should adopt the parameter file from the lower likelihood run as your new base. \### Copy the files for jittering
+
+```{r copy_files_for_jittering}
+#
+# 1. Define directory paths and settings
+# Core directory containing your base model files
+base_dir<- file.path(run_dir,"run_19_as_for_18_includes_ageerr")
+
+# New directory where jitter runs will be executed
+jitter_dir <- file.path(run_dir,"run_19_jitter_runs") 
+
+# 2. Setup the jitter directory
+# Copies necessary files (starter, control, data, forecast, ss.exe)
+r4ss::copy_SS_inputs(
+  dir.old = base_dir,
+  dir.new = jitter_dir,
+  overwrite = TRUE,
+  verbose = TRUE
+)
+```
+
+### Do the jitter analysis
+
+One note is that the jitter fraction in the starter file in the run folder for jittering must be set to 0.1 (or whatever the jitter_fraction is) manually before running this.
+
+**This section including the call to the jitter() function is commented out so as to not accidentally start 500 jitters by pushing the Render button**
+
+```{r jitter_analysis}
+## 3. Execute the jitter loop
+# This function automatically modifies starter.ss and runs SS3
+
+
+# jitter_results <- r4ss::jitter(
+#   dir = jitter_dir,            # Directory with model files
+#   Njitter = 500,               # Number of random trials (100+ is standard)
+#   jitter_fraction = 0.1,        # Your chosen reasonable jitter fraction
+#   init_values_src = 0,         # 0 = start each run from the init values in control file
+#   printlikes = TRUE,            # Prints likelihoods to console during runs
+#   exe = "ss3_win"
+# )
+
+## 4. Analyze the results
+## Print a summary of the negative log-likelihoods across all runs
+
+#print(jitter_results)
+
+# Count how many runs successfully converged to the global minimum
+# (Assuming the lowest value in the vector is the global minimum)
+#global_min <- min(jitter_results, na.rm = TRUE)
+#success_count <- sum(jitter_results == global_min, na.rm = TRUE)
+
+#cat("Global minimum likelihood found:", global_min, "\n")
+#cat("Number of runs that converged to this minimum:", success_count, "out of", #length(jitter_results), "\n")
+
+```
+
+#### Summary of 2026 jitter runs:
+
+Global minimum likelihood found: 793.469\
+Number of runs that converged to this minimum: 330 out of 500
+
+This matches the likelihood from the original base case run (run_19) of 793.469, so the .par file was not changed and the model did not need to be initiated with a different parameter vector.
+
+## Make comparison plots
+
 I use and made the R package AreaGrowthRex, originally for a manuscript. It makes nicer comparison plots than r4ss and includes plots of fits to age-length data, as well as maturity-at-age overlaid on selectivity plots.
 
-I updated the 2021 accepted run to use the newest version of ss3 for these plots as the number of columns in the report.sso catch section differs between versions.
+I updated the 2021 accepted run to use the newest version of ss3 for these plots as the number of columns in the report.sso catch section differs between the version used in 2021 and the version used for this assessment (v3.30.25.1).
 
-####Organize runs for comparison
+### Organize runs for comparison
+
 ```{r readfiles, include = FALSE, message = FALSE, warning = FALSE}
 compare_dir<-file.path(run_dir,"comparison_plots")
 if (!dir.exists(compare_dir)) {
@@ -287,8 +369,8 @@ the_run_list<-r4ss::SSgetoutput(dirvec = c(run_2021,run_17,run_18,run_base),getc
 #SummaryList<-r4ss::SSsummarize(MasterList)
 ```
 
-#### Make comparison plots
-Notes: spr is reported as raw SPR in starter files. Last year of recruitment estimates is current year -3 (consistent with long life in the plankton), but in 2026 we have no survey, the last survey was 2025, so set to current year -4.
+### Make the plots
+
 ```{r plot estimated pop dynamics, echo = FALSE, message = FALSE, warning = FALSE, fig.cap = "Figure 6. Observed catches and estimated spawning biomass, recruitment, and fishing intensity (1-spawning potential ratio) for each of the four alternative models with new data added"}
 
 
@@ -309,6 +391,100 @@ bigfig<-(total_catch_plot/ssbplot/recplot/fi_plot)
 ggplot2::ggsave(filename = file.path(compare_dir,paste0("compare_time_series.png")),device = "png",width = 8.5,height = 11)
 
 bigfig
+```
+
+### Plot fits to growth across model runs
+Specimen data were pulled using pull_gap_products repo and the rex example. Would be nicer if pull_gap_products were an R package and I could use it to re-pull the data needed here.
+
+```{r}
+data_dir<-"C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2026/goa_rex/data/output"
+
+specimen_data<-read.csv(file.path(data_dir,"survey_spatial_specimen_data.csv")) %>%
+  dplyr::rename_with(toupper)
+```
+
+```{r plot growth, echo = FALSE, message = FALSE, warning = FALSE, fig.cap = "Figure 3. Raw bottom trawl survey data length-at-age by area and sex, overlayed with mean length-at-age for each model (columns) and 90% asymptotic uncertainty intervals around the means (shaded areas). The Eastern GOA is shown in green and the Western-Central GOA is shown in blue."}
+
+
+ 
+g<-AreaGrowthRex::plot_growth(ssruns=the_run_list,sslabels=the_run_labels,thedata= specimen_data, savePlot = FALSE)
+g
+ggplot2::ggsave(filename = file.path(compare_dir,"Plot_Growth_AllModels.png"),device = "png",width = 10,height = 5)
+
+```
+
+```{r plot selectivity overlaid on maturity, echo = FALSE, message = FALSE, warning = FALSE, fig.cap = "Figure 7. Fishery and survey selectivity-at-age across models for males and females. Plots for females are overlaid on maturity-at-age"}
+p<-plot_selex_maturity(ssruns=the_run_list,mlabels=the_run_labels) 
+ggsave(filename = file.path(compare_dir,paste0("Plot_Selex_Maturity_AllModels.png")),device = "png",width = 10,height = 7)
+```
+
+### Run retrospectives
+
+doRetros is deprecated and there was a bug in 3.30.01. The code below is used but is commented out so that a long process does not start by pressing Render.
+
+```{r run_retrospectives}
+
+# # New directory where jitter runs will be executed
+ retro_dir <- file.path(run_dir,"run_19_retro_runs") 
+# 
+# # 2. Setup the jitter directory
+# # Copies necessary files (starter, control, data, forecast, ss.exe)
+# r4ss::copy_SS_inputs(
+#   dir.old = base_dir,
+#   dir.new = retro_dir,
+#   overwrite = TRUE,
+#   verbose = TRUE
+# )
+# 
+# future::plan(strategy = "multicore")
+# retros<-retro(dir = retro_dir, years = 0:-10, exe = "ss3_win")
+
+```
+
+
+### Do OSA residuals
+
+### Run the projections
+
+
+### Apportionment
+#### Open the AFSC database
+
+(assumes username and password are already saved using the keyring package)
+
+```{r}
+# Store email username with password
+#key_set_with_value(service = "service or email", 
+#                   username = "your_address@example.com",
+#                   password = "test password")
+
+afsc_user  =  keyring::key_list("afsc")$username  ## enter afsc username
+afsc_pwd   = keyring::key_get("afsc", keyring::key_list("afsc")$username)   ## enter afsc password
+akfin_user = keyring::key_list("akfin")$username ## enter AKFIN username
+akfin_pwd  =  keyring::key_get("akfin", keyring::key_list("akfin")$username)   ## enter AKFIN password
+
+
+afsc = DBI::dbConnect(odbc::odbc(), "afsc",
+                      UID = afsc_user, PWD = afsc_pwd)
+akfin = DBI::dbConnect(odbc::odbc(), "akfin",
+                       UID = akfin_user, PWD = akfin_pwd)
+```
+
+Pull the akfin.gap_products.akfin_biomass_v table to get proportion by NMFS regulatory area, including W Yakutat and SE. Would be good to fit the get_spatial_biomass function into a package somewhere for this. There's AreaGrowthRex, rema, pull_gap_products (if it ends up as a package), survey_ISS, and then the goa_rex repo. Where should this go? And the fishery length comp code as well - it should come out of newsbbs and where should it go though?
+
+The views table has a column called nmfs_statistical_area that has the info to split by W Yak and SE outside.
+```{r get_spatial_biomass}
+source("C:/GitProjects/goa_rex/R/get_spatial_biomass.R", echo = TRUE)
+spatial_biomass_data<-get_spatial_biomass(srv_sp_str=c('10200'),surv_id = c('47'),conn = akfin) 
+
+spatial_biomass_data %>% distinct(nmfs_statistical_area)
+
+spatial_biomass_data %>% distinct(regulatory_area) %>%
+  filter(regulatory_area == "EASTERN GOA - NMFS") %>%
+  distinct(year)
+
+spatial_biomass_data %>% filter(nmfs_statistical_area=="West Yakutat District")
+
 ```
 
 
