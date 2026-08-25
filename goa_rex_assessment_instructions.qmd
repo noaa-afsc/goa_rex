@@ -34,12 +34,13 @@ newlibs <-c('r4ss',
             'keyring',
             'DBI',
             'odbc',
-            'afscISS',
-            'surveyISS',
-            'ggplot2',
-            'AreaGrowthRex',
             'patchwork',
             'future',
+            'stringr',
+            'lubridate',
+            'ggplot2',                    'afscISS',
+            'surveyISS',
+            'AreaGrowthRex',
             'spmR',
             'rema')
 
@@ -47,6 +48,27 @@ pacman::p_load(char = newlibs) #load packages
 ```
 
 ## Obtaining GOA rex sole assessment data inputs
+#### Open the AFSC database
+
+(assumes username and password are already saved using the keyring package)
+
+```{r}
+# Store email username with password
+#key_set_with_value(service = "service or email", 
+#                   username = "your_address@example.com",
+#                   password = "test password")
+
+afsc_user  =  keyring::key_list("afsc")$username  ## enter afsc username
+afsc_pwd   = keyring::key_get("afsc", keyring::key_list("afsc")$username)   ## enter afsc password
+akfin_user = keyring::key_list("akfin")$username ## enter AKFIN username
+akfin_pwd  =  keyring::key_get("akfin", keyring::key_list("akfin")$username)   ## enter AKFIN password
+
+
+afsc = DBI::dbConnect(odbc::odbc(), "afsc",
+                      UID = afsc_user, PWD = afsc_pwd)
+akfin = DBI::dbConnect(odbc::odbc(), "akfin",
+                       UID = akfin_user, PWD = akfin_pwd)
+```
 
 The assessment uses the following data:
 
@@ -366,8 +388,9 @@ label_18 <- "new data"
 label_base <-"base model"
 
 the_run_labels <-c(label_2021,label_17,label_18,label_base)
+the_run_dirs<-c(run_2021,run_17,run_18,run_base)
 
-the_run_list<-r4ss::SSgetoutput(dirvec = c(run_2021,run_17,run_18,run_base),getcomp = TRUE, getcovar = TRUE)
+the_run_list<-r4ss::SSgetoutput(dirvec = the_run_dirs,getcomp = TRUE, getcovar = TRUE)
 
 #SummaryList<-r4ss::SSsummarize(MasterList)
 ```
@@ -442,7 +465,14 @@ qq$combo
 
 ggplot2::ggsave(filename = file.path(compare_dir,paste0("Agg_fits_age_comps_all_models.png")),plot = qq$combo,device = "png",width = 10,height = 7)
 ```
+### Some tables
+```{r parameter_tables}
+#get parameter tables:
+compare_params<-AreaGrowthRex::compare_bio_pars(the_run_list,the_run_labels)
+write.csv(compare_params,file.path(compare_dir,"compare_time_inv_params.csv"))
 
+
+```
 
 ### Run retrospectives
 
@@ -505,31 +535,184 @@ write.csv(mohn_df,file = file.path(compare_dir,"afsc_hurtado_mohn.csv"))
 
 ### Do OSA residuals
 
-### Run the projections
+
+### Do the projections
+
+#### Do the catch estimation
+Make sure the akfin connection is open. What is the right package to house the functions used in this chunk? Is it spmR? AreaGrowthRex?  
+
+Note: this does not work for the eastern goa because there are no 2026 catches to go on in the catch estimation function. The egoa catch data are typically confidential and zero or almost zero so filling in spm.dat needs to be done by hand and be careful of the reporting in the SAFE to not report confidential information.  
+```{r query detailed catch data}
+source("C:/GitProjects/goa_rex/R/query_catch_blend.R", echo = TRUE)
+source("C:/GitProjects/goa_rex/R/hp_catch_estimation.R", echo = TRUE)
+
+#query the akfin.council.comprehensive_blend AKRO catch accounting data
+wc_catch_data<-query_catch_blend(akfin_conn=akfin,sp_group_code='REXS',region= c('WG','CG'))
+e_catch_data<-query_catch_blend(akfin_conn=akfin,sp_group_code='REXS',region= c('WY','EY','SE'))
+
+
+#write out the latest date for catches queried for reporting (very few catches in egoa so I think using wc for this is ok)
+latest_date <-wc_catch_data %>% filter(week_end_date ==max(week_end_date))
+
+write.csv(latest_date,file.path(DataDir,"latest_catch_date_reported.csv"))
+
+# make a wc and an e centralized folder for estimated catch info and past spm.dat
+wc_organize_proj_dir <- file.path(DataDir,"wc_proj_info")
+e_organize_proj_dir<- file.path(DataDir,"e_proj_info")
+
+  if (!dir.exists(wc_organize_proj_dir)) {
+    dir.create(wc_organize_proj_dir, recursive = TRUE)
+  }
+
+  if (!dir.exists(e_organize_proj_dir)) {
+    dir.create(e_organize_proj_dir, recursive = TRUE)
+  }
+
+wc_hp_catch<-hp_catch_estimation(the_dir= wc_organize_proj_dir,catch_data = wc_catch_data,avg_yrs = 5)
+
+#egoa does not have enough data for this query
+#e_hp_catch<-hp_catch_estimation(the_dir= wc_organize_proj_dir,catch_data = #e_catch_data,avg_yrs = 5)
+
+e_goa_yearly_catch <-e_catch_data %>% mutate(year= year(week_end_date)) %>%
+   group_by(year) %>%
+  summarise(sum_catch = sum(weight_posted))
+write.csv(e_goa_yearly_catch,file= file.path(e_organize_proj_dir,"e_goa_yearly_catch.csv"))
+
+e_goa_5_yr_avg<-e_goa_yearly_catch %>% 
+  filter(year<2026,year>=2026-5) %>%
+  ungroup() %>%
+  summarize(avg_catch = mean(sum_catch))
+write.csv(e_goa_5_yr_avg,file= file.path(e_organize_proj_dir,"e_goa_5yr_avg.csv"))
+
+#Make one centralized place for spm.dat to go and update from the info in the same folder
+past_proj_dir<-"C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2024/rex/harvest_projections"
+
+  file.copy(
+    from = file.path(past_proj_dir, "western_central","spm.dat"), 
+    to = file.path(wc_organize_proj_dir, "spm.dat"), 
+    overwrite = FALSE
+  )
+  
+  file.copy(
+    from = file.path(past_proj_dir, "eastern","spm.dat"), 
+    to = file.path(e_organize_proj_dir, "spm.dat"), 
+    overwrite = FALSE
+  )  
+    
+```
+#### Transfer realized and estimated catch information to the spm.dat files
+Now put the right estimated and realized catch values into the spm.dat file using the wc_organize_proj_dir and e_organize_proj_dir folders created above. Put the catch info in that folder into the spm.dat in the same folder. Do this before the next steps. I could automate this and I haven't.  
+
+##### Update these fields in spm.dat for executive summary table projections:    
+beg_yr   
+2026 # (end year of the stock assessment model)  
+  
+data_files for each species                    
+ForProjections_GrowthMorph1.dat  #this a western-central example - growth morph 1 is for western-central in the ss3 stuff  
+  
+
+fixed_catch              
+2026 1 #estimated catch filling in what will be caught at end of year   
+2027 1 #5 year average catch  
+2028 1 #5 year average catch  
+2029 1 #5 year average catch  
+  
+
+#### make the .dat files
+```{r write_projection_dat_file}
+
+AreaGrowthRex::get_projections(mydir = run_17 ,MyOutput = the_run_list[[2]],NagesProject = 20,FirstYr = 1982,LastYr = 2021,RecruitmentAge=3,species="Rex")
+
+AreaGrowthRex::get_projections(mydir = run_18 ,MyOutput = the_run_list[[3]],NagesProject = 20,FirstYr = 1982,LastYr = 2021,RecruitmentAge=3,species="Rex")
+
+AreaGrowthRex::get_projections(mydir = run_base ,MyOutput = the_run_list[[4]],NagesProject = 20,FirstYr = 1982,LastYr = 2021,RecruitmentAge=3,species="Rex")
+```
+
+#### make the folder structure and put files in the right place.
+past_proj_dir is where the most recent completed harvest projections are. The spm.dat files should have been updated by hand with realized and estimated catches
+```{r}
+#define the runs that we want to do projections for
+the_proj_dirs<-c(run_18,run_base)
+wc_proj_dir <- file.path(the_proj_dirs, "wc_projections")
+
+# Loop through each path in the vector
+for (i in seq_along(the_proj_dirs)) {
+  # Create directory if it does not exist
+  if (!dir.exists(wc_proj_dir[i])) {
+    dir.create(wc_proj_dir[i], recursive = TRUE)
+  }
+  
+  # Copy the file to the new directory
+  file.copy(
+    from = file.path(the_proj_dirs[i], "ForProjections_GrowthMorph1.dat"), 
+    to = file.path(wc_proj_dir[i], "ForProjections_GrowthMorph1.dat"), 
+    overwrite = TRUE
+  )
+}
+
+e_proj_dir<-file.path(the_proj_dirs,"e_projections")
+
+# Loop through each path in the vector
+for (i in seq_along(the_proj_dirs)) {
+  # Create directory if it does not exist
+  if (!dir.exists(e_proj_dir[i])) {
+    dir.create(e_proj_dir[i], recursive = TRUE)
+  }
+  
+  # Copy the file to the new directory
+  file.copy(
+    from = file.path(the_proj_dirs[i], "ForProjections_GrowthMorph2.dat"), 
+    to = file.path(e_proj_dir[i], "ForProjections_GrowthMorph2.dat"), 
+    overwrite = TRUE
+  )
+  
+  #Copy the past hp's tacpar.dat and spm.dat to the new folders
+  # Copy the file to the new directory
+  file.copy(
+    from = file.path(past_proj_dir, "western_central","tacpar.dat"), 
+    to = file.path(wc_proj_dir[i], "tacpar.dat"), 
+    overwrite = TRUE
+  )
+    
+   file.copy(
+    from = file.path(past_proj_dir, "eastern","tacpar.dat"), 
+    to = file.path(e_proj_dir[i], "tacpar.dat"), 
+    overwrite = TRUE
+  )
+ 
+   file.copy(
+    from = file.path(wc_organize_proj_dir,"spm.dat"), 
+    to = file.path(wc_proj_dir[i], "spm.dat"), 
+    overwrite = TRUE
+  ) 
+    file.copy(
+    from = file.path(e_organize_proj_dir,"spm.dat"), 
+    to = file.path(e_proj_dir[i], "spm.dat"), 
+    overwrite = TRUE
+  )
+}
+
+```
+  
+  
+**Now check the actual files to make sure everything looks right!**  
+  
+    
+#### Run the projections and make the executive summary table
+```{r run_projections_for_list_of_runs}
+wc_proj_detail<-list()
+e_proj_detail<-list()
+for (i in 1:length(wc_proj_dir)) {
+wc_proj_detail[[i]] <- spmR::runSPM(wc_proj_dir[i], run = FALSE, engine = "admb")
+str(wc_proj_detail)
+
+e_proj_detail[[i]]<- spmR::runSPM(e_proj_dir[i], run = FALSE, engine = "admb")
+str(e_proj_detail)
+}
+```
 
 
 ### Apportionment
-#### Open the AFSC database
-
-(assumes username and password are already saved using the keyring package)
-
-```{r}
-# Store email username with password
-#key_set_with_value(service = "service or email", 
-#                   username = "your_address@example.com",
-#                   password = "test password")
-
-afsc_user  =  keyring::key_list("afsc")$username  ## enter afsc username
-afsc_pwd   = keyring::key_get("afsc", keyring::key_list("afsc")$username)   ## enter afsc password
-akfin_user = keyring::key_list("akfin")$username ## enter AKFIN username
-akfin_pwd  =  keyring::key_get("akfin", keyring::key_list("akfin")$username)   ## enter AKFIN password
-
-
-afsc = DBI::dbConnect(odbc::odbc(), "afsc",
-                      UID = afsc_user, PWD = afsc_pwd)
-akfin = DBI::dbConnect(odbc::odbc(), "akfin",
-                       UID = akfin_user, PWD = akfin_pwd)
-```
 
 Pull the akfin.gap_products.akfin_biomass_v table to get proportion by NMFS regulatory area, including W Yakutat and SE. Would be good to fit the get_spatial_biomass function into a package somewhere for this. There's AreaGrowthRex, rema, pull_gap_products (if it ends up as a package), survey_ISS, and then the goa_rex repo. Where should this go? And the fishery length comp code as well - it should come out of newsbbs and where should it go though?
 
