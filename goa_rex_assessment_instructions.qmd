@@ -19,7 +19,8 @@ devtools::install_github("afsc-assessments/afscISS")
 install.packages("C:/GitProjects/surveyISS", repos = NULL, type = "source")
 
 devtools::install_github("careymcg/AreaGrowthRex")
-
+devtools::install_github("afsc-assessments/rema", dependencies = TRUE, build_vignettes = TRUE)
+devtools::install_github(repo = "afsc-assessments/spmR", dependencies = TRUE, build_vignettes = TRUE)
 
 if (!requireNamespace("pacman", quietly = TRUE)) {
   install.packages("pacman")
@@ -38,7 +39,9 @@ newlibs <-c('r4ss',
             'ggplot2',
             'AreaGrowthRex',
             'patchwork',
-            'future')
+            'future',
+            'spmR',
+            'rema')
 
 pacman::p_load(char = newlibs) #load packages
 ```
@@ -369,7 +372,7 @@ the_run_list<-r4ss::SSgetoutput(dirvec = c(run_2021,run_17,run_18,run_base),getc
 #SummaryList<-r4ss::SSsummarize(MasterList)
 ```
 
-### Make the plots
+### Plots comparing time-series estimates
 
 ```{r plot estimated pop dynamics, echo = FALSE, message = FALSE, warning = FALSE, fig.cap = "Figure 6. Observed catches and estimated spawning biomass, recruitment, and fishing intensity (1-spawning potential ratio) for each of the four alternative models with new data added"}
 
@@ -388,12 +391,20 @@ total_catch_plot<-AreaGrowthRex::plot_total_catch(ssruns = the_run_list,mlabel =
 #from library(patchwork)
 bigfig<-(total_catch_plot/ssbplot/recplot/fi_plot)
 
-ggplot2::ggsave(filename = file.path(compare_dir,paste0("compare_time_series.png")),device = "png",width = 8.5,height = 11)
+ggplot2::ggsave(filename = file.path(compare_dir,paste0("compare_time_series.png")),plot=bigfig,device = "png",width = 8.5,height = 11)
 
 bigfig
 ```
 
-### Plot fits to growth across model runs
+### Plots comparing fits to the indices
+```{r plot index fits, echo = FALSE, message = FALSE, warning = FALSE, fig.cap = "Figure 5. Fits (lines) to female and male GOA bottom trawl survey biomass indices for the Western-Central and Eastern GOA."}
+
+p<-AreaGrowthRex::compare_index_fits(ssruns = the_run_list,mlabels=the_run_labels)
+p
+ggplot2::ggsave(filename = file.path(compare_dir,"index_fits_all_models.png"),device = "png",width = 10, height = 7)
+```
+
+### Plots comparing fits to growth data
 Specimen data were pulled using pull_gap_products repo and the rex example. Would be nicer if pull_gap_products were an R package and I could use it to re-pull the data needed here.
 
 ```{r}
@@ -405,18 +416,33 @@ specimen_data<-read.csv(file.path(data_dir,"survey_spatial_specimen_data.csv")) 
 
 ```{r plot growth, echo = FALSE, message = FALSE, warning = FALSE, fig.cap = "Figure 3. Raw bottom trawl survey data length-at-age by area and sex, overlayed with mean length-at-age for each model (columns) and 90% asymptotic uncertainty intervals around the means (shaded areas). The Eastern GOA is shown in green and the Western-Central GOA is shown in blue."}
 
-
- 
 g<-AreaGrowthRex::plot_growth(ssruns=the_run_list,sslabels=the_run_labels,thedata= specimen_data, savePlot = FALSE)
 g
-ggplot2::ggsave(filename = file.path(compare_dir,"Plot_Growth_AllModels.png"),device = "png",width = 10,height = 5)
+ggplot2::ggplot2::ggsave(filename = file.path(compare_dir,"Plot_Growth_AllModels.png"),device = "png",width = 10,height = 5)
 
 ```
 
+Plot selectivity and maturity
 ```{r plot selectivity overlaid on maturity, echo = FALSE, message = FALSE, warning = FALSE, fig.cap = "Figure 7. Fishery and survey selectivity-at-age across models for males and females. Plots for females are overlaid on maturity-at-age"}
-p<-plot_selex_maturity(ssruns=the_run_list,mlabels=the_run_labels) 
-ggsave(filename = file.path(compare_dir,paste0("Plot_Selex_Maturity_AllModels.png")),device = "png",width = 10,height = 7)
+p<-AreaGrowthRex::plot_selex_maturity(ssruns=the_run_list,mlabels=the_run_labels) 
+ggplot2::ggsave(filename = file.path(compare_dir,paste0("Plot_Selex_Maturity_AllModels.png")),device = "png",width = 10,height = 7)
 ```
+
+Plot length comps for two-area models. What about the survey lengths from the eastern GOA? Need to work on this plot as these are not included.
+```{r plot length comps two area models, echo = FALSE, message = FALSE, warning = FALSE, fig.cap = "Figure 4. Fits (lines) to female and male fishery length composition with data aggregated by year (shaded regions) for the two-area area model."}
+q<-AreaGrowthRex::plot_comps_twoarea(ssruns = the_run_list, narea = 2, mnames = the_run_labels,comptype = "length")
+q$combo
+ggplot2::ggsave(filename = file.path(compare_dir,paste0("Agg_fits_length_comps_all_models.png")),q$combo,device = "png",width = 10,height = 7)
+```
+```{r plot fishery ages two area models, echo = FALSE, message = FALSE, warning = FALSE, fig.cap = "Figure 5. Fits (lines) to female and male fishery age composition with data aggregated by year (shaded regions) for the two-area area model with fishery ages included in model inputs."}
+
+qq<-AreaGrowthRex::plot_comps_twoarea(ssruns = the_run_list, narea = 2, mnames = the_run_labels,comptype = "age")
+
+qq$combo
+
+ggplot2::ggsave(filename = file.path(compare_dir,paste0("Agg_fits_age_comps_all_models.png")),plot = qq$combo,device = "png",width = 10,height = 7)
+```
+
 
 ### Run retrospectives
 
@@ -425,6 +451,7 @@ doRetros is deprecated and there was a bug in 3.30.01. The code below is used bu
 ```{r run_retrospectives}
 
 # # New directory where jitter runs will be executed
+ NRetro = 10
  retro_dir <- file.path(run_dir,"run_19_retro_runs") 
 # 
 # # 2. Setup the jitter directory
@@ -437,10 +464,44 @@ doRetros is deprecated and there was a bug in 3.30.01. The code below is used bu
 # )
 # 
 # future::plan(strategy = "multicore")
-# retros<-retro(dir = retro_dir, years = 0:-10, exe = "ss3_win")
+# retros<-retro(dir = retro_dir, years = 0:-NRetro, exe = "ss3_win")
 
 ```
+### Plot retrospectives
 
+```{r plot retrospective population dynamics, echo = FALSE, message = FALSE, warning = FALSE, fig.cap = "Figure 6. Observed catches and estimated spawning biomass, recruitment, and fishing intensity (1-spawning potential ratio) for the retrospective runs"}
+NRetro = 10
+the_retro_dirs=c(file.path(retro_dir,"retrospectives",paste("retro",1:NRetro,sep="-")),file.path(retro_dir,"retrospectives","retro0"))
+the_retro_labels <-c(paste0("retro ",-1:-NRetro),"base model")
+the_retro_list <- r4ss::SSgetoutput(dirvec=the_retro_dirs,getcovar = F,forecast = F)
+retroSummary <- r4ss::SSsummarize(retroModels)
+endyrvec <- retroSummary$endyrs - 0:NRetro
+
+bottom_left_dir<-file.path(compare_dir,"bottom_left")
+if (!dir.exists(bottom_left_dir)) {
+  dir.create(bottom_left_dir, recursive = TRUE)
+}
+
+top_right_dir<-file.path(compare_dir,"top_right")
+if (!dir.exists(top_right_dir)) {
+  dir.create(top_right_dir, recursive = TRUE)
+}
+
+r4ss::SSplotComparisons(retroSummary, plotdir = bottom_left_dir,print = TRUE,endyrvec=endyrvec,xlim = c(1982,2026),legendloc = "bottomleft", legendlabels=paste("Data",0:NRetro,"years"))
+dev.off()
+
+r4ss::SSplotComparisons(retroSummary, plotdir = top_right_dir,print = TRUE,endyrvec=endyrvec,xlim = c(1982,2026),legendloc = "topright", legendlabels=paste("Data",0:NRetro,"years"))
+
+write.csv(retroSummary$pars,file = file.path(compare_dir,"RetroParComparison.csv"))
+#Calculate Mohn's rho:
+#AFSC Mohn's rho:
+
+mohn<-r4ss::SSmohnsrho(retroSummary, endyrvec, verbose = TRUE)
+
+mohn_df<-tibble(ssb = mohn$AFSC_Hurtado_SSB, recruitment = mohn$AFSC_Hurtado_Rec, fishing_mortality = mohn$AFSC_Hurtado_F, bratio = mohn$AFSC_Hurtado_Bratio)
+
+write.csv(mohn_df,file = file.path(compare_dir,"afsc_hurtado_mohn.csv"))
+```
 
 ### Do OSA residuals
 
