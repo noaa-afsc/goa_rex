@@ -27,7 +27,11 @@ query_catch_blend<-function(akfin_conn,sp_group_code,region) {
                 reporting_area_code =reporting_area_code,
                 species_name = species_name,
                 species_group_name = species_group_name,
-                akfin_species_code = akfin_species_code) %>%
+                akfin_species_code = akfin_species_code,
+                agency_gear_code = agency_gear_code,
+                fmp_gear = fmp_gear,
+                reporting_area_code,
+                harvest_sector) %>%
   dplyr::collect() -> .the_data
   return(.the_data)
 }

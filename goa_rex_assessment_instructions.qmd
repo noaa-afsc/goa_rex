@@ -7,6 +7,85 @@ editor: visual
 
 # GOA rex sole assessment instructions
 
+## Make some directories to use throughout
+
+```{r make_directories}
+#Directories used
+past_proj_dir<-"C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2024/rex/harvest_projections"
+DataDir = "C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2026/goa_rex/data/"
+data_dir<-"C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2026/goa_rex/data/output"
+run_dir<-"C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2026/goa_rex/runs"
+previous_assess_dir<-"C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2021/Rex/Runs"
+WorkDir = "C:/Users/carey.mcgilliard/Work/"
+CodeDir = "C:/GitProjects/newsbss/"
+OutDir = "C:\\Users\\carey.mcgilliard\\Work\\FlatfishAssessments\\2026\\goa_rex\\data\\Fishery_Lengths\\"
+retro_compare_dir<-file.path(run_dir,"retro_comparison_plots")
+# make a wc and an e centralized folder for estimated catch info and past spm.dat
+wc_organize_proj_dir <- file.path(DataDir,"wc_proj_info")
+e_organize_proj_dir<- file.path(DataDir,"e_proj_info")
+past_proj_dir<-"C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2024/rex/harvest_projections"
+
+#Organize for comparison plots across runs
+run_dir<-"C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2026/goa_rex/runs"
+compare_dir<-file.path(run_dir,"comparison_plots")
+
+if (!dir.exists(compare_dir)) {
+  dir.create(compare_dir, recursive = TRUE)
+}
+
+compare_19_20_dir<-file.path(run_dir,"compare_run_19_run_20")
+
+if (!dir.exists(compare_dir)) {
+  dir.create(compare_19_20_dir, recursive = TRUE)
+}
+
+
+end_year= 2026
+species = "Rex"#"Halibut" #BSAI_flats #Dover #"Flathead" "Rex" 
+the_run <- "run_19_as_for_18_includes_ageerr"
+
+#Runs that we are working with
+run_2021 <-file.path(run_dir,"run_2021_accepted_new_ss3v")
+#run_17 <- file.path(run_dir,"run_17_asfor7_newdata_excludes_2025_caal")
+run_18 <- file.path(run_dir,"run_18_as_for_17_newdata_includes_2025_caal")
+run_base<- file.path(run_dir,"run_19_as_for_18_includes_ageerr")
+run_20<-file.path(run_dir,"run_20_change_survey_index_timing")
+the_run_dirs<-c(run_2021,run_18,run_base)
+the_proj_dirs<-c(run_18,run_base)
+
+the_run_dirs_20<-c(run_base, run_20)
+the_proj_dirs_20<-c(run_base,run_20)
+
+wc_five_year_proj<-file.path(run_base,"wc_five_year_projections_alt_3")
+e_five_year_proj<-file.path(run_base,"e_five_year_projections_alt_3")
+
+if (!dir.exists(wc_five_year_proj)) {
+  dir.create(wc_five_year_proj, recursive = TRUE)
+}
+if (!dir.exists(e_five_year_proj)) {
+  dir.create(e_five_year_proj, recursive = TRUE)
+}
+
+wc_five_year_proj_ABC<-file.path(run_base,"wc_five_year_projections_ABC")
+e_five_year_proj_ABC<-file.path(run_base,"e_five_year_projections_ABC")
+
+if (!dir.exists(wc_five_year_proj)) {
+  dir.create(wc_five_year_proj_ABC, recursive = TRUE)
+}
+if (!dir.exists(e_five_year_proj)) {
+  dir.create(e_five_year_proj_ABC, recursive = TRUE)
+}
+
+#Labels for the runs
+label_2021<-"2021 accepted"
+#label_17 <- "new data excludes 2025 caal"
+label_18 <- "new data"
+label_base <-"base model"
+label_20<-"mid-year survey timing"
+the_run_labels <-c(label_2021,label_18,label_base)
+the_run_labels_20<-c(label_base,label_20)
+```
+
 ## Read in libraries
 
 ```{r}
@@ -45,7 +124,8 @@ newlibs <-c('r4ss',
             'surveyISS',
             'AreaGrowthRex',
             'spmR',
-            'rema')
+            'rema',
+            'knitr')
 
 pacman::p_load(char = newlibs) #load packages
 ```
@@ -56,11 +136,14 @@ pacman::p_load(char = newlibs) #load packages
 
 (assumes username and password are already saved using the keyring package)
 
-```{r}
-# Store email username with password
-#key_set_with_value(service = "service or email", 
-#                   username = "your_address@example.com",
-#                   password = "test password")
+```{r open_sql_keyring}
+
+# when your afsc pwd is updated you can easily change it using 
+#keyring::key_set_with_value(service="afsc", username="my_username", password = "new_password")
+
+#if there is an extra user on a key:
+#key_delete(service = "afsc", username = first_user)
+#keyring::key_get("afsc", "MCGILLIARDC")
 
 afsc_user  =  keyring::key_list("afsc")$username  ## enter afsc username
 afsc_pwd   = keyring::key_get("afsc", keyring::key_list("afsc")$username)   ## enter afsc password
@@ -112,7 +195,6 @@ The following specifications are needed and are typically entered in the code pi
 
 ```{r}
 
-DataDir = "C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2026/goa_rex/data/"
 dir.create(file.path(DataDir,"Fishery_Lengths"))
 
 len_bins<-seq(from = 9, to = 65, by = 2)
@@ -141,7 +223,6 @@ There is a separate piece of code for getting the sample sizes: https://github.c
 Below are the right specifications for rex sole for the file used for getting the number of hauls for which there are length samples. The code used for getting this info (which is used as sample size for the fishery length comps in the assesmsent input) is:
 
 ```{r}
-OutDir = "C:\\Users\\carey.mcgilliard\\Work\\FlatfishAssessments\\2026\\goa_rex\\data\\Fishery_Lengths\\"
 
 #
 #Flathead sole only = 103, Rex = 105, Dover = 107, Bering flounder = 145, GT = 102, Deepsea sole = 110
@@ -154,6 +235,8 @@ with_unsexed = F #T
 ```
 
 Then I read in the output generated by the dinosaur code to format the length comps for ss3, as follows. Note that previous assessments have left out years with low nhauls and I opted to leave these in as they should not impact the objective function much if the number of hauls is very low. I will just list the iss on the plots coming out of r4ss.
+
+**Important note: remember to comment out years of fishery length comps for which we have fishery age data so as to not double count the length data - this could be automated in the future**
 
 ```{r}
 fishery_lengths<-read.csv(file.path(OutDir,"Observer_Length_Comps.csv")) |>
@@ -170,7 +253,7 @@ fishery_lengths_ss3<-read.csv(file.path(OutDir,"Num_Hauls_ForAndDom_Fishery_AllG
   dplyr::arrange(year) 
 
 write.csv(fishery_lengths_ss3,file = file.path(OutDir,"fishery_lengths_ss3_fmt.csv"))
-
+print("time to remove/comment out years of length comps for which there are fishery age data before putting the fishery lengths into the assessment")
 ```
 
 #### Side notes about fishery data
@@ -250,21 +333,17 @@ theme_set(.THEME)
 
 ### Make the single-run r4ss plots for relevant runs
 
+Don't forget to look at the tunings and update the data weighting in the ss3 input model
+
 ```{r r4ss_plots}
 
-windows(record = T)
+#windows(record = T)
 par(mfrow = c(1,1),cex.axis = 1.8, cex.lab = 1.8,lwd = 3,omi =c(0.3,0.1,0.3,0.3), mai = c(1.02,1,0.82,0.42),bty = "l")
 
-species = "Rex"#"Halibut" #BSAI_flats #Dover #"Flathead" "Rex" 
-run_dir<-"C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2026/goa_rex/runs"
-the_run <- "run_19_as_for_18_includes_ageerr"
 
 SS3PredDir = file.path(run_dir,the_run)
 setwd(SS3PredDir) #this ends at the end of the chunk
 
-previous_assess_dir<-"C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2021/Rex/Runs"
-WorkDir = "C:/Users/carey.mcgilliard/Work/"
-CodeDir = "C:/GitProjects/newsbss/"
 
 Uncertainty = T #make r4ss plots with or without uncertainty plotted
 FirstYr = 1982 #This is important later for projections and the phase plot.
@@ -274,33 +353,74 @@ NagesProject = 20 #NagesProject is the plus group age for projections, which is 
 
 #r4ss, basic plot file, bias adjustment, and Francis lambdas
 
-MyOutput = SS_output(dir = SS3PredDir,covar = Uncertainty,forecast=TRUE,printstats=FALSE)
+setwd(run_base)
+MyOutput = SS_output(dir = run_base,covar = Uncertainty,forecast=TRUE,printstats=FALSE)
+
+#Calculate francis data weighting changes
+setwd(run_base)
+Francis <-tune_comps(replist=MyOutput, fleets = "all", option = "Francis",digits = 2,write = TRUE)
+# MI<-SS_tune_comps(replist=MyOutput, fleets = "all", option = "MI", digits = 6, write = TRUE)
 
 SS_plots(replist = MyOutput,uncertainty=Uncertainty) 
 
 SSplotPars(replist = MyOutput,showpost = F,fitrange = T, nrow = 8,ncol = 4,pheight= 8,pwidth = 8)
 dev.copy(pdf,'plots/SSplotPars.pdf')
 dev.off()
-```
 
+
+setwd(run_18)
+model_25.0 = SS_output(dir =run_18, covar =T, forecast = TRUE, printstats = FALSE)
+
+SS_plots(replist = model_25.0,uncertainty=Uncertainty) 
+SSplotPars(replist = model_25.0,showpost = F,fitrange = T, nrow = 8,ncol = 4,pheight= 8,pwidth = 8)
+dev.copy(pdf,'plots/SSplotPars.pdf')
+
+
+# setwd(run_20)
+# model_run_20 = SS_output(dir =run_20, covar =T, forecast = TRUE, printstats = FALSE)
+# SS_plots(replist = model_run_20, uncertainty = TRUE)
+# SSplotPars(replist = model_run_20,showpost = F,fitrange = T, nrow = 8,ncol = 4,pheight= 8,pwidth = 8)
+# dev.copy(pdf,'plots/SSplotPars.pdf')
+
+dev.off()
+
+```
+```{r}
+source("C:/GitProjects/goa_rex/R/write_proj_ss_CRM_2_growth_morphs_and_SARA.r", echo = TRUE)
+
+write_proj(data_file=file.path(run_base,"ForProjections_GrowthMorph1.dat"),
+           sara_file = "Western_Central_Rex_SARA.dat",
+           data=MyOutput,GrowthMorph=1,area =1,Narea = 2,Nmorph = 2,NAGES=20,FY=1982,LY=end_year,RecAge = 3, RecAgeSS = 0,species = "REX",Region = "GOA",
+                     Tier = "3a",
+                     AssessType = "full",
+                     SSversion = "SS-V3.30")
+
+write_proj(data_file=file.path(run_base,"ForProjections_GrowthMorph2.dat"),
+           sara_file = "Eastern_Rex_SARA.dat",
+           data=MyOutput,GrowthMorph=2,area =2,Narea = 2,Nmorph = 2,NAGES=20,FY=1982,LY=end_year,RecAge = 3, RecAgeSS = 0,species = "REX",Region = "GOA",
+                     Tier = "3a",
+                     AssessType = "full",
+                     SSversion = "SS-V3.30")
+
+
+write_proj(data_file=file.path(run_18,"ForProjections_GrowthMorph1.dat"),
+           sara_file = "Western_Central_Rex_SARA.dat",
+           data=MyOutput,GrowthMorph=1,area =1,Narea = 2,Nmorph = 2,NAGES=20,FY=1982,LY=end_year,RecAge = 3, RecAgeSS = 0,species = "REX",Region = "GOA",
+                     Tier = "3a",
+                     AssessType = "full",
+                     SSversion = "SS-V3.30")
+
+write_proj(data_file=file.path(run_18,"ForProjections_GrowthMorph2.dat"),
+           sara_file = "Eastern_Rex_SARA.dat",
+           data=MyOutput,GrowthMorph=2,area =2,Narea = 2,Nmorph = 2,NAGES=20,FY=1982,LY=end_year,RecAge = 3, RecAgeSS = 0,species = "REX",Region = "GOA",
+                     Tier = "3a",
+                     AssessType = "full",
+                     SSversion = "SS-V3.30")
+
+```
 Make the working directory for saving things SS3PredDir until further notice
 
-```{r change_wd_to_current_run}
-#| label: setup
-#| include: false
-knitr::opts_knit$set(root.dir = SS3PredDir)
-```
-
-### Calculate changes in data weighting.
-
-The models (except for a sensitivity analysis) use Francis weighting.
-
-```{r data_weighting}
-
- Francis <-tune_comps(replist=MyOutput, fleets = "all", option = "Francis",digits = 2,write = TRUE)
-# MI<-SS_tune_comps(replist=MyOutput, fleets = "all", option = "MI", digits = 6, write = TRUE)
-
-```
+\#`{r change_wd_to_current_run} ##| label: setup ##| include: false #knitr::opts_knit$set(root.dir = SS3PredDir) #`
 
 ## Jitter analysis
 
@@ -374,35 +494,71 @@ I use and made the R package AreaGrowthRex, originally for a manuscript. It make
 
 I updated the 2021 accepted run to use the newest version of ss3 for these plots as the number of columns in the report.sso catch section differs between the version used in 2021 and the version used for this assessment (v3.30.25.1).
 
-### Organize runs for comparison
+### Organize for comparison plots
 
-```{r readfiles, include = FALSE, message = FALSE, warning = FALSE}
-compare_dir<-file.path(run_dir,"comparison_plots")
-if (!dir.exists(compare_dir)) {
-  dir.create(compare_dir, recursive = TRUE)
-}
-run_2021 <-file.path(run_dir,"run_2021_accepted_new_ss3v")
-run_17 <- file.path(run_dir,"run_17_asfor7_newdata_excludes_2025_caal")
-run_18 <- file.path(run_dir,"run_18_as_for_17_newdata_includes_2025_caal")
-run_base<- file.path(run_dir,"run_19_as_for_18_includes_ageerr")
+```{r organize_comparisons, include = FALSE, message = FALSE, warning = FALSE}
 
-label_2021<-"2021 accepted"
-label_17 <- "new data excludes 2025 caal"
-label_18 <- "new data"
-label_base <-"base model"
-
-the_run_labels <-c(label_2021,label_17,label_18,label_base)
-the_run_dirs<-c(run_2021,run_17,run_18,run_base)
 
 the_run_list<-r4ss::SSgetoutput(dirvec = the_run_dirs,getcomp = TRUE, getcovar = TRUE)
+summary_run_list<-r4ss::SSsummarize(the_run_list)
+endyrvec <- c(2021,2026, 2026)
 
-#SummaryList<-r4ss::SSsummarize(MasterList)
+
+bottom_left_dir<-file.path(compare_dir,"bottom_left")
+if (!dir.exists(bottom_left_dir)) {
+  dir.create(bottom_left_dir, recursive = TRUE)
+}
+
+top_right_dir<-file.path(compare_dir,"top_right")
+if (!dir.exists(top_right_dir)) {
+  dir.create(top_right_dir, recursive = TRUE)
+}
+
+r4ss::SSplotComparisons(summary_run_list, plotdir = bottom_left_dir,print = TRUE,endyrvec=endyrvec,xlim = c(1982,2026),legendloc = "bottomleft",legendlabels=the_run_labels)
+dev.off()
+
+r4ss::SSplotComparisons(summary_run_list, plotdir = top_right_dir,print = TRUE,endyrvec=endyrvec,xlim = c(1982,2026),legendloc = "topright", legendlabels = the_run_labels)
+
+the_run_labels[1] <-"accepted_model"
+
+write.csv(summary_run_list$pars,file = file.path(compare_dir,"ParComparison.csv"))
+```
+
+Very late in the game I discovered that I had survey timing for all of the survey biomass years and areas set to January instead of July. I corrected this in run 20. This came up in the explanation for differences in survey biomass likelihoods between SPoRC and ss3 for Model 25.0 and Model 25.1 Here, I compare run 20 with run 19, the original base case. The results are the same, but not fully identical. The specs will likely be affected in a small way. I am choosing to re-run and add the new results.
+
+```{r organize_comparisons, include = FALSE, message = FALSE, warning = FALSE}
+the_run_list_20<-r4ss::SSgetoutput(dirvec = the_run_dirs_20,getcomp = TRUE, getcovar = TRUE)
+summary_run_list_20<-r4ss::SSsummarize(the_run_list_20)
+endyrvec <- c(2021,2026, 2026)
+
+
+bottom_left_dir<-file.path(compare_19_20,"bottom_left")
+if (!dir.exists(bottom_left_dir)) {
+  dir.create(bottom_left_dir, recursive = TRUE)
+}
+
+top_right_dir<-file.path(compare_19_20,"top_right")
+if (!dir.exists(top_right_dir)) {
+  dir.create(top_right_dir, recursive = TRUE)
+}
+
+r4ss::SSplotComparisons(summary_run_list_20, plotdir = bottom_left_dir,print = TRUE,endyrvec=endyrvec,xlim = c(1982,2026),legendloc = "bottomleft",legendlabels=the_run_labels_20)
+dev.off()
+
+r4ss::SSplotComparisons(summary_run_list_20, plotdir = top_right_dir,print = TRUE,endyrvec=endyrvec,xlim = c(1982,2026),legendloc = "topright", legendlabels = the_run_labels_20)
+
+the_run_labels[1] <-"accepted_model"
+
+write.csv(summary_run_list_20$pars,file = file.path(compare_19_20,"ParComparison.csv"))
 ```
 
 ### Plots comparing time-series estimates
 
 ```{r plot estimated pop dynamics, echo = FALSE, message = FALSE, warning = FALSE, fig.cap = "Figure 6. Observed catches and estimated spawning biomass, recruitment, and fishing intensity (1-spawning potential ratio) for each of the four alternative models with new data added"}
 
+#need ssbplot for the base case for stock assessment guidelines
+ssb_base_plot<-AreaGrowthRex::plot_ssbs(ssruns = the_run_list[3], mlabel = the_run_labels[3], showxlabel = TRUE, showlegend = "yes",color_option = "cividis",color_direction =1)
+ggplot2::ggsave(filename = file.path(run_base,"plots",paste0("ssb_base_case.png")),plot = ssb_base_plot)
 
 #need to make y-axis on ssb go to zero
 ssbplot<-AreaGrowthRex::plot_ssbs(ssruns=the_run_list,mlabel=the_run_labels,showxlabel =   FALSE,showlegend = "none",color_option = "cividis",color_direction =-1)
@@ -437,7 +593,6 @@ ggplot2::ggsave(filename = file.path(compare_dir,"index_fits_all_models.png"),de
 Specimen data were pulled using pull_gap_products repo and the rex example. Would be nicer if pull_gap_products were an R package and I could use it to re-pull the data needed here.
 
 ```{r}
-data_dir<-"C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2026/goa_rex/data/output"
 
 specimen_data<-read.csv(file.path(data_dir,"survey_spatial_specimen_data.csv")) %>%
   dplyr::rename_with(toupper)
@@ -447,7 +602,7 @@ specimen_data<-read.csv(file.path(data_dir,"survey_spatial_specimen_data.csv")) 
 
 g<-AreaGrowthRex::plot_growth(ssruns=the_run_list,sslabels=the_run_labels,thedata= specimen_data, savePlot = FALSE)
 g
-ggplot2::ggplot2::ggsave(filename = file.path(compare_dir,"Plot_Growth_AllModels.png"),device = "png",width = 10,height = 5)
+ggplot2::ggsave(filename = file.path(compare_dir,"Plot_Growth_AllModels.png"),device = "png",width = 10,height = 5)
 
 ```
 
@@ -455,6 +610,7 @@ Plot selectivity and maturity
 
 ```{r plot selectivity overlaid on maturity, echo = FALSE, message = FALSE, warning = FALSE, fig.cap = "Figure 7. Fishery and survey selectivity-at-age across models for males and females. Plots for females are overlaid on maturity-at-age"}
 p<-AreaGrowthRex::plot_selex_maturity(ssruns=the_run_list,mlabels=the_run_labels) 
+p
 ggplot2::ggsave(filename = file.path(compare_dir,paste0("Plot_Selex_Maturity_AllModels.png")),device = "png",width = 10,height = 7)
 ```
 
@@ -464,6 +620,7 @@ Plot length comps for two-area models. What about the survey lengths from the ea
 q<-AreaGrowthRex::plot_comps_twoarea(ssruns = the_run_list, narea = 2, mnames = the_run_labels,comptype = "length")
 q$combo
 ggplot2::ggsave(filename = file.path(compare_dir,paste0("Agg_fits_length_comps_all_models.png")),q$combo,device = "png",width = 10,height = 7)
+
 ```
 
 ```{r plot fishery ages two area models, echo = FALSE, message = FALSE, warning = FALSE, fig.cap = "Figure 5. Fits (lines) to female and male fishery age composition with data aggregated by year (shaded regions) for the two-area area model with fishery ages included in model inputs."}
@@ -481,8 +638,6 @@ ggplot2::ggsave(filename = file.path(compare_dir,paste0("Agg_fits_age_comps_all_
 #get parameter tables:
 compare_params<-AreaGrowthRex::compare_bio_pars(the_run_list,the_run_labels)
 write.csv(compare_params,file.path(compare_dir,"compare_time_inv_params.csv"))
-
-
 ```
 
 ### Run retrospectives
@@ -494,18 +649,18 @@ doRetros is deprecated and there was a bug in 3.30.01. The code below is used bu
 # # New directory where jitter runs will be executed
  NRetro = 10
  retro_dir <- file.path(run_dir,"run_19_retro_runs") 
-# 
-# # 2. Setup the jitter directory
-# # Copies necessary files (starter, control, data, forecast, ss.exe)
-# r4ss::copy_SS_inputs(
-#   dir.old = base_dir,
-#   dir.new = retro_dir,
-#   overwrite = TRUE,
-#   verbose = TRUE
-# )
-# 
-# future::plan(strategy = "multicore")
-# retros<-retro(dir = retro_dir, years = 0:-NRetro, exe = "ss3_win")
+
+# 2. Setup the jitter directory
+# Copies necessary files (starter, control, data, forecast, ss.exe)
+r4ss::copy_SS_inputs(
+  dir.old = run_base,
+  dir.new = retro_dir,
+  overwrite = TRUE,
+  verbose = TRUE
+)
+
+future::plan(strategy = "multicore")
+retros<-retro(dir = retro_dir, years = 0:-NRetro, exe = "ss3_win")
 
 ```
 
@@ -516,15 +671,15 @@ NRetro = 10
 the_retro_dirs=c(file.path(retro_dir,"retrospectives",paste("retro",1:NRetro,sep="-")),file.path(retro_dir,"retrospectives","retro0"))
 the_retro_labels <-c(paste0("retro ",-1:-NRetro),"base model")
 the_retro_list <- r4ss::SSgetoutput(dirvec=the_retro_dirs,getcovar = F,forecast = F)
-retroSummary <- r4ss::SSsummarize(retroModels)
+retroSummary <- r4ss::SSsummarize(the_retro_list)
 endyrvec <- retroSummary$endyrs - 0:NRetro
 
-bottom_left_dir<-file.path(compare_dir,"bottom_left")
+bottom_left_dir<-file.path(retro_compare_dir,"bottom_left")
 if (!dir.exists(bottom_left_dir)) {
   dir.create(bottom_left_dir, recursive = TRUE)
 }
 
-top_right_dir<-file.path(compare_dir,"top_right")
+top_right_dir<-file.path(retro_compare_dir,"top_right")
 if (!dir.exists(top_right_dir)) {
   dir.create(top_right_dir, recursive = TRUE)
 }
@@ -534,7 +689,7 @@ dev.off()
 
 r4ss::SSplotComparisons(retroSummary, plotdir = top_right_dir,print = TRUE,endyrvec=endyrvec,xlim = c(1982,2026),legendloc = "topright", legendlabels=paste("Data",0:NRetro,"years"))
 
-write.csv(retroSummary$pars,file = file.path(compare_dir,"RetroParComparison.csv"))
+write.csv(retroSummary$pars,file = file.path(retro_compare_dir,"RetroParComparison.csv"))
 #Calculate Mohn's rho:
 #AFSC Mohn's rho:
 
@@ -545,11 +700,13 @@ mohn_df<-tibble(ssb = mohn$AFSC_Hurtado_SSB, recruitment = mohn$AFSC_Hurtado_Rec
 write.csv(mohn_df,file = file.path(compare_dir,"afsc_hurtado_mohn.csv"))
 ```
 
+### Phase plot
+
 ### Do OSA residuals
 
 ### Do the projections
 
-#### Do the catch estimation
+#### Catch estimation
 
 Make sure the akfin connection is open. What is the right package to house the functions used in this chunk? Is it spmR? AreaGrowthRex?
 
@@ -572,8 +729,8 @@ latest_date <-wc_catch_data %>% filter(week_end_date ==max(week_end_date))
 write.csv(latest_date,file.path(DataDir,"latest_catch_date_reported.csv"))
 
 # make a wc and an e centralized folder for estimated catch info and past spm.dat
-wc_organize_proj_dir <- file.path(DataDir,"wc_proj_info")
-e_organize_proj_dir<- file.path(DataDir,"e_proj_info")
+#wc_organize_proj_dir <- file.path(DataDir,"wc_proj_info")
+#e_organize_proj_dir<- file.path(DataDir,"e_proj_info")
 
   if (!dir.exists(wc_organize_proj_dir)) {
     dir.create(wc_organize_proj_dir, recursive = TRUE)
@@ -600,7 +757,7 @@ e_goa_5_yr_avg<-e_goa_yearly_catch %>%
 write.csv(e_goa_5_yr_avg,file= file.path(e_organize_proj_dir,"e_goa_5yr_avg.csv"))
 
 #Make one centralized place for spm.dat to go and update from the info in the same folder
-past_proj_dir<-"C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2024/rex/harvest_projections"
+#past_proj_dir<-"C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2024/rex/harvest_projections"
 
   file.copy(
     from = file.path(past_proj_dir, "western_central","spm.dat"), 
@@ -640,26 +797,30 @@ I think there is a problem here where spm.tpl was changed and something (recruit
 
 ```{r write_projection_dat_file}
 
-AreaGrowthRex::get_projections(mydir = run_17 ,MyOutput = the_run_list[[2]],NagesProject = 20,FirstYr = 1982,LastYr = end_year,RecruitmentAge=3,species="Rex")
+AreaGrowthRex::get_projections(mydir = run_2021 ,MyOutput = the_run_list[[1]],NagesProject = 20,FirstYr = 1982,LastYr = 2021,RecruitmentAge=3,species="Rex")
 
-AreaGrowthRex::get_projections(mydir = run_18 ,MyOutput = the_run_list[[3]],NagesProject = 20,FirstYr = 1982,LastYr = end_year,RecruitmentAge=3,species="Rex")
+AreaGrowthRex::get_projections(mydir = run_18 ,MyOutput = the_run_list[[2]],NagesProject = 20,FirstYr = 1982,LastYr = end_year,RecruitmentAge=3,species="Rex")
 
-AreaGrowthRex::get_projections(mydir = run_base ,MyOutput = the_run_list[[4]],NagesProject = 20,FirstYr = 1982,LastYr = end_year,RecruitmentAge=3,species="Rex")
+AreaGrowthRex::get_projections(mydir = run_base ,MyOutput = the_run_list[[3]],NagesProject = 20,FirstYr = 1982,LastYr = end_year,RecruitmentAge=3,species="Rex")
 ```
 
 #### make the folder structure and put files in the right place.
 
 past_proj_dir is where the most recent completed harvest projections are. The spm.dat files should have been updated by hand with realized and estimated catches. This chunk should mostly be a function with the_proj_dirs as input.
 
+*Don't run the next chunk for the 2021 model - don't overwrite the spm.dat file for the last accepted model, OR go back and re-copy in the previous spm.dat to the new folder run before making the executive summary table.*
+
+Most of the run directories are specified in the chunk @organize_comparisons
+
 ```{r}
 #| label: organize_projections
-#define the runs that we want to do projections for
-#the_proj_dirs<-c(run_18,run_base)
+
+
 #the_proj_dirs<-c(base_old_ss3_dir) #for troubleshooting, start below
 #the_proj_dirs<-(c(age0_smry_bio_dir)) #for troubleshooting, start below
 #the_proj_dirs<-(c(run_2021_new_ss3_dir))
 #the_proj_dirs<-(c(run_19_old_spm_dir))
-the_proj_dirs<-(c(run_19_half_rec_dir))
+#the_proj_dirs<-(c(run_19_half_rec_dir))
 
 wc_proj_dir <- file.path(the_proj_dirs, "wc_projections")
 
@@ -726,7 +887,21 @@ for (i in seq_along(the_proj_dirs)) {
 
 #### Run the projections and make the executive summary table
 
-This does not work at all for actually running spm, but it does work after running spm. I ran the projections manually and I copied in spm.exe, which I first compiled with ADMB 13.0. It might be that it has to be sourced locally after compiling spm.tpl (?) the rtmb implementation didnt work either. I also don't know why the make_tier3a_exec_table.R table is not integrated into the package
+\*Important note: In spm.tpl, there was a change between 2021 and 2024 where previously we input total recruitment across sexes and in the current version we need to input recruitment for only 1 sex, or total recruitment/2.
+
+Lines 630-634 in the PARAMETER_SECTION under LOCAL_CALCS (and you can see that the earlier assumption is commented out, and that this applies to 2-sex model output. The solution is to fix this in the AreaGrowthRex package under R/write_proj_ss_2Area.R and R/write_proj_ss_1Area.R by either only entering female recruits or by dividing in half prior to writing it out.\*
+
+````         
+```         
+if (nsexes(ispp)==1) 
+  AMeanRec(ispp) = mean(R(ispp));  // Arithmetic mean
+else
+  AMeanRec(ispp) = 2.*mean(R(ispp));  // Arithmetic mean, converted to females (half) later
+  // AMeanRec(ispp) = mean(R(ispp));  // Arithmetic mean, converted to females (half) later
+```
+````
+
+spmR works best by cloning the repo and compiling spm.tpl yourself, putting it in your path or projection folder and running the .exe, then using the spmR R functions. The following will work after running spm in each projection folder. I ran the projections manually and I copied in spm.exe, which I first compiled with ADMB 13.0.The rtmb implementation didnt work either. I also don't know why the make_tier3a_exec_table.R table is not integrated into the spmR package and need to get it in there after assessments.
 
 ```{r}
 #| label: make_exec_summary_tables
@@ -737,18 +912,385 @@ wc_proj_detail<-list()
 e_proj_detail<-list()
 wc_exec<-list()
 e_exec<-list()
+end_year_vec = c(2026,2026) # in case running new projections for an older year model
 
 for (i in 1:length(wc_proj_dir)) {
 wc_proj_detail[[i]] <- spmR::runSPM(wc_proj_dir[i], run = FALSE, engine = "admb")
 str(wc_proj_detail)
 
-wc_exec[i]<-make_tier3a_exec_table(wc_proj_dir[i],endyr=end_year,the_scalar=1000)
+wc_exec[i]<-make_tier3a_exec_table(wc_proj_dir[i],endyr=end_year_vec[i],the_scalar=1000)
 
 e_proj_detail[[i]]<- spmR::runSPM(e_proj_dir[i], run = FALSE, engine = "admb")
 str(e_proj_detail)
+
+e_exec[i]<-make_tier3a_exec_table(e_proj_dir[i],endyr=end_year_vec[i],the_scalar=1000)
 }
 
-e_exec[i]<-make_tier3a_exec_table(e_proj_dir[i],endyr=end_year,the_scalar=1000)
+```
+
+Make the scenario projection tables
+
+```{r make_scenario_projection tables}
+
+proj_catches_wc<-scenario_tables(proj_dir = wc_proj_dir[[2]],
+                                 spm_detail_df = wc_proj_detail[[i]],the_scalar = 1000)
+
+proj_catches_e<-scenario_tables(proj_dir = e_proj_dir[[2]],
+                                 spm_detail_df = e_proj_detail[[i]],the_scalar = 1000)
+```
+
+### 5 year projections
+
+For rex sole because it's a spatial model we have to run the five year projection table after doing apportionment because we need western+central ABC and eastern combined abc for years 2027 and 2028.
+
+Here are the 2026 instructions for this: Provide a table of 5 year projections using the author recommend ABC for model end years +1 and +2 based on the author’s catch projection recommendation, and Scenario 3, as described in the Standard Harvest Scenarios and Projection Methodology, for model end years +3 to +5 with the following headers: Year, Expected Catch, OFL, ABC, Mean SSB, Mean Relative Spawning Biomass (ratio of female spawning biomass to equilibrium unfished female spawning biomass (B100%)).
+
+Scenario 3 is: In all future years, F is set equal to 50% of max FABC. (Rationale: This scenario provides a likely lower bound on FABC that still allows future harvest rates to be adjusted downward when stocks fall below reference levels.)
+
+*Note: to do scenario 3 and write out the correct ABC, you have to use MaxABC, which is now incorporated into the five_year_hp_table function. Pull Alt 3 results. Run spm with the recommended ABCs from the executive summary table for 2027 and 2028, and unspecified 2029-2031 catches.*
+
+The projection model runs for 5 year table: Alt 3
+
+```{r five_year_projections_part_1}
+source("C:/GitProjects/goa_rex/R/five_year_hp_table.R", echo = TRUE)
+
+#these are the 5-year projection tables, except that ABC is wrong.
+wc_five_year_alt_3_df<-five_year_hp_table(hp_dir =wc_five_year_proj ,current_year = year(today()),alt = 3)
+
+e_five_year_alt_3_df<-five_year_hp_table(hp_dir =e_five_year_proj ,current_year = year(today()),alt = 3) # %>%  dplyr:: mutate(mean_catch = as.character(mean_catch),mean_catch = if_else(Year > 2028, "C", mean_catch))
+
+```
+
+<!-- The second projection model run to get the right ABCs for the 5-year projection table. -->
+
+<!-- Now take the catches that come from running with Alt = 3 and put them in spm.dat (manually) and re-run spm in a new folder (manually). Then re-make the five-year projection tables using Alt 1 to get the right ABC that goes along with catches that come from the fixed F (alt 3) run. -->
+
+<!-- ```{r five_year_projections_final} -->
+<!-- source("C:/GitProjects/goa_rex/R/five_year_hp_table.R", echo = TRUE) -->
+
+<!-- #these are the 5-year projection tables, except that ABC is wrong. -->
+<!-- wc_five_year_ABC_df<-five_year_hp_table(hp_dir =wc_five_year_proj_ABC ,current_year = year(today()),alt = 1) -->
+
+<!-- e_five_year_ABC_df<-five_year_hp_table(hp_dir =e_five_year_proj_ABC ,current_year = year(today()),alt = 1) # %>%  dplyr:: mutate(mean_catch = as.character(mean_catch),mean_catch = if_else(Year > 2028, "C", mean_catch)) -->
+
+
+<!-- ``` -->
+
+### Apportionment
+
+Pull the akfin.gap_products.akfin_biomass_v table to get proportion by NMFS regulatory area, including W Yakutat and SE. Would be good to fit the get_spatial_biomass function into a package somewhere for this. There's AreaGrowthRex, rema, pull_gap_products (if it ends up as a package), survey_ISS, and then the goa_rex repo. Where should this go? And the fishery length comp code as well - it should come out of newsbbs and where should it go though?
+
+The views table has a column called nmfs_statistical_area that has the info to split by W Yak and SE outside.
+
+split_fractions is a table by year listing the proportion of biomass in WYak vs SE for years when survey aligned with INPFC areas, which is all years before 2025. WYak and SE are NMFS areas, so this was a bespoke method. Now the survey aligns with NMFS statistical areas, so the spatial biomass data in akfin.gap_products.akfin_biomass_v using the column nmfs_statistical_area should align from 2025 onward. We will always need to cobble together the full biomass series from these two periods: pre-2025 and onward.
+
+```{r egoa_biomass_by_stat_area}
+source("C:/GitProjects/goa_rex/R/get_biomass_by_stat_area.R", echo = TRUE)
+biomass_rema_df<-get_biomass_by_stat_area(conn = akfin,data_dir=data_dir,sp_group_code = 'rex sole',survey_species_code=c('10200'),surv_id = c('47'))
+
+#table for the doc
+spatial_biomass_df<-biomass_rema_df %>%
+  tidyr::pivot_wider(id_cols = year,names_from = strata,values_from = c(biomass,cv)) %>%
+  dplyr::relocate(biomass_wgoa,cv_wgoa,biomass_cgoa,cv_cgoa,biomass_wyak,cv_wyak,biomass_se,cv_se)
+
+write.csv(spatial_biomass_df,file.path(DataDir,"spatial_survey_biomass_table.csv"),na = "")
+```
+
+Set up and run rema, first with an assumption of shared process error over strata (areas). this doesn't work with the following error message: Error in rema::prepare_rema_input(model_name = "rema goa rex sole", biomass_dat = biomass_rema_df, : user defined multi_survey as TRUE but did not provide CPUE survey data in the admb_re list or as a dataframe in the cpue_dat argument.
+
+```{r run_rema_shared_pe}
+
+# the original ADMB model shared PE across all strata
+input_shared_pe <- rema::prepare_rema_input(model_name = 'rema goa rex sole shared pe',
+                            biomass_dat = biomass_rema_df,
+                            multi_survey = 1,
+                            PE_options = list(pointer_PE_biomass = c(1, 1, 1)))
+model_shared_pe <- fit_rema(input_shared_pe)
+output_shared_pe <- tidy_rema(rema_model = model_shared_pe)
+kable(output_shared_pe$parameter_estimates) # estimated fixed effects parameters
+```
+
+Next, run without the assumption of shared process error. This works, but for rex I need to run one model for western and central data and another for Wyak and SE.
+
+```{r run_rema}
+wc_biomass_rema_df<-biomass_rema_df %>% filter(strata == 'cgoa' | strata == 'wgoa')
+wc_input <- rema::prepare_rema_input(model_name = 'wc rema goa rex sole',
+                            biomass_dat = wc_biomass_rema_df,
+                            multi_survey = 0)
+wc_model <- fit_rema(wc_input)
+wc_output<- tidy_rema(rema_model = wc_model)
+wc_est_params<-wc_output$parameter_estimates # estimated fixed effects parameters
+wc_area_proportions<-wc_output$proportion_biomass_by_strata %>% filter(year==2025)
+write.csv(wc_output$proportion_biomass_by_strata,file = file.path(data_dir,"wc_rema_proportions.csv"))
+```
+
+Eastern GOA rema model
+
+```{r run_rema_egoa}
+e_biomass_rema_df<-biomass_rema_df %>% filter(strata == 'wyak' | strata == 'se')
+e_input <- rema::prepare_rema_input(model_name = 'e rema goa rex sole',
+                            biomass_dat = e_biomass_rema_df,
+                            multi_survey = 0)
+e_model <- fit_rema(e_input)
+e_output<- tidy_rema(rema_model = e_model)
+e_est_params<-e_output$parameter_estimates # estimated fixed effects parameters
+e_area_proportions<-e_output$proportion_biomass_by_strata %>% filter(year==2025)
+write.csv(e_output$proportion_biomass_by_strata,file = file.path(data_dir,"e_rema_proportions.csv"))
+```
+
+Long projection tables
+
+```{r}
+
+
+```
+
+## Making survey cpue maps
+
+Matt Callahan made these for me. They come from this code:
+
+Kalei says Matt used to make IDW maps (inverse weighted distance), but the survey group mentioned that they are innappropriate for GOA/AI survey data and for much marine ecological data. Kalei asked gemini why that would be a bad method and this is what it said:\
+"Yes, using Inverse Distance Weighting (IDW) to interpolate Catch Per Unit Effort (CPUE) haul data, as seen in "Screenshot 2026-08-27 161053.png" for shortraker rockfish in the Aleutian Islands, is generally considered inappropriate for marine ecological data.\
+While IDW is easy to compute and visually striking, its underlying mathematical assumptions conflict with the biological realities of how marine species are distributed. Here are the primary reasons why this method falls short for this type of fisheries data:\
+**Ignores Depth and Habitat Boundaries:** IDW calculates values based purely on 2D geographic distance. It assumes that if you have a high catch at Point A, a location physically close to it (Point B) should also have a high catch. However, marine environments—especially in the Aleutian Islands—feature steep drop-offs and complex bathymetry. Point A might be at an optimal depth of 300 meters, while Point B, just a mile away, might be in a 2,000-meter trench or on a shallow reef. IDW will incorrectly interpolate high biomass across these entirely different habitats.\
+**The "Bullseye" Effect on Patchy Data:** Fisheries data, particularly for rockfish, is famously patchy and often "zero-inflated" (many hauls with zero catch, and a few hauls with massive catches). IDW handles extreme values poorly, smoothing them out in a circular radius that creates unrealistic "bullseyes" of high density around a single large haul, rather than reflecting actual habitat contours.\
+**Assumes Isotropic Distribution:** IDW assumes that spatial influence spreads equally in all directions (isotropy). In marine shelf environments, habitats and oceanographic conditions typically stretch parallel to the coastline or shelf break. Therefore, fish distributions are highly directional (anisotropic).\
+**No Environmental Covariates:** IDW is strictly mathematical and cannot incorporate driving environmental factors. It predicts fish presence based solely on where other fish were caught, rather than modeling why they are there based on variables like bottom temperature, substrate type, or depth. **Lack of Uncertainty Estimation:** IDW is a deterministic method, meaning it generates a fixed surface but provides no estimate of variance or error. For fisheries management and stock assessments, knowing the confidence intervals of a spatial distribution is just as important as the estimate itself.\
+**Better Alternatives**\
+For data like this, fisheries scientists typically use model-based approaches that account for environmental covariates and spatial autocorrelation. Vector Autoregressive Spatio-Temporal (VAST) models, Generalized Additive Models (GAMs), or Kriging with external drift are standard because they allow bathymetry and habitat types to constrain the interpolation, resulting in maps that actually reflect the species' ecology."\
+so I guess it's not good to use that method for various reasons, so he used the plotting function and made points weighted by cpue. it's just really hard to see patterns that way, but is what it is
+
+### Time series and other plots and tables for the base case run (MyOutput)
+
+```{r}
+setwd(run_base)
+MyOutput = SS_output(dir = run_base,covar = Uncertainty,forecast=TRUE,printstats=FALSE)
+
+
+
+
+
+```
+
+### Fishery tables
+
+```{r}
+ source("C:/GitProjects/goa_rex/R/query_catch_blend.R", echo = TRUE)
+catch_data<-query_catch_blend(akfin_conn=akfin,sp_group_code='REXS',region= c('WG','CG','WY','EY','SE'))
+
+tot_catch_df<-catch_data %>% 
+  dplyr::group_by(year) %>%
+  dplyr::summarise(Catch = sum(weight_posted))
+write.csv(tot_catch_df,file.path(DataDir,"Total_Catch.csv"))
+
+
+r_d_catch_df<-catch_data %>% 
+  dplyr::group_by(year,retained_or_discarded) %>%
+  dplyr::summarise(catch = sum(weight_posted)) %>%
+  tidyr::pivot_wider(id_cols=year,names_from = retained_or_discarded,values_from = catch) %>%
+  dplyr::mutate(total_catch = D + R) %>%
+  dplyr::rename(Discarded = D, Retained = R, Total = total_catch) %>%
+  dplyr::mutate(Proportion_Retained = Retained/Total)
+write.csv(r_d_catch_df, file.path(DataDir,"R_D_Catch.csv"))
+
+catch_by_gear_df<-catch_data %>%
+  dplyr::group_by(year,agency_gear_code) %>%
+  dplyr::summarise(catch = sum(weight_posted)) %>%
+  dplyr::left_join(tot_catch_df) %>%
+  dplyr::mutate(prop = catch/Catch) %>%
+  tidyr::pivot_wider(id_cols = year, names_from = agency_gear_code,values_from = prop) %>% dplyr::mutate(across(where(is.numeric), ~ replace_na(.x, 0)),
+               non_pelagic_trawl = NPT + BTR) %>%
+  dplyr::filter(year>=1996)
+write.csv(catch_by_gear_df,file.path(DataDir,"catch_by_gear.csv"))
+
+catch_by_season<-catch_data %>%
+  dplyr::mutate(month = lubridate::month(week_end_date)) %>%
+  dplyr::mutate(season = case_when(month <=3 ~ "Q1",
+                                   month > 3 & month<=6 ~ "Q2",
+                                   month >6 & month<9 ~ "Q3",
+                                   TRUE ~ "Q4")) %>%
+  dplyr::group_by(year,season) %>%
+  dplyr::summarise(catch = sum(weight_posted)) %>%
+  tidyr::pivot_wider(id_cols = year,names_from = season, values_from = catch) %>%
+  left_join(tot_catch_df) %>%
+  dplyr::mutate(Q1_prop=Q1/Catch, Q2_prop = Q2/Catch, Q3_prop = Q3/Catch, Q4_prop = Q4/Catch)
+write.csv(catch_by_season, file.path(DataDir,"catch_by_season.csv"))
+
+
+catch_by_nmfs_area_df<-catch_data %>%
+  dplyr::group_by(year,reporting_area_code) %>%
+  dplyr::summarise(catch = sum(weight_posted)) %>%
+  dplyr::left_join(tot_catch_df) %>%
+  dplyr::mutate(prop = catch/Catch) %>%
+  tidyr::pivot_wider(id_cols = year,names_from = reporting_area_code, values_from = prop) %>%
+  dplyr::mutate(across(where(is.numeric), ~ replace_na(.x,0)))
+
+write.csv(catch_by_nmfs_area_df,file.path(DataDir,"catch_by_nmfs_area_df.csv"))
+
+#just out of interest and could be combined with season, nmfs_area
+catch_by_sector_df<-catch_data %>%
+  dplyr::group_by(year,harvest_sector) %>%
+  dplyr::summarise(catch = sum(weight_posted)) %>%
+  tidyr::pivot_wider(id_cols = year,names_from = harvest_sector,values_from = catch)
+write.csv(catch_by_sector_df,file.path(DataDir,"catch_by_sector.csv"))
+```
+
+### PSC tables
+
+```{r}
+#source the function
+source("C:/GitProjects/goa_rex/R/query_psc.R", echo = TRUE)
+psc<-query_psc(akfin_conn = akfin,region = 'GOA')
+
+target_species <- psc %>% distinct(trip_target_name)
+psc_all_species<-psc %>% 
+  dplyr::group_by(year,species_group_name) %>%
+  dplyr:: mutate(halibut_mortality_tons = tidyr::replace_na(halibut_mortality_tons, 0)) %>%
+  dplyr::summarise(pscnq_estimate = sum(pscnq_estimate),halibut_mortality_tons = sum(halibut_mortality_tons))
+
+psc_species<-psc %>%
+  dplyr::filter(trip_target_name == "Rex Sole - GOA") %>%
+    dplyr:: mutate(halibut_mortality_tons = tidyr::replace_na(halibut_mortality_tons, 0)) %>%
+  group_by(year,species_group_name) %>%
+  dplyr::summarise(pscnq_estimate_rex = sum(pscnq_estimate),halibut_mortality_rex = sum(halibut_mortality_tons)) %>%
+  dplyr::left_join(psc_all_species) %>%
+  dplyr::mutate(pscnq_prop = pscnq_estimate_rex/pscnq_estimate, halibut_mortality_prop = halibut_mortality_rex/halibut_mortality_tons,halibut_mortality_prop = tidyr::replace_na(halibut_mortality_prop,"")) %>%
+  dplyr::select(year,species_group_name,pscnq_prop,halibut_mortality_prop)
+
+pscnq_halibut<-psc_species %>%
+  dplyr::filter(species_group_name == "Halibut")
+write.csv(pscnq_halibut,file.path(DataDir,"psc_halibut_proportion_from_rex.csv"))
+
+pscnq_other<-psc_species %>%
+  dplyr::filter(species_group_name!="Halibut") %>%
+  dplyr::select(-c(halibut_mortality_prop)) %>%
+  tidyr::pivot_wider(id_cols = year,names_from = species_group_name, values_from = pscnq_prop) %>%
+  dplyr::mutate(across(everything(), ~ round(.x, 3)),
+                across(everything(), ~ replace_na(.x,0))) 
+write.csv(pscnq_other,file.path(DataDir,"psc_other_proportion_from_rex.csv"))
+
+```
+
+### Survey tables
+
+Here we need a table with survey biomass, stdev with depth included.
+
+```{r}
+surv_df<-get_biomass_by_depth(srv_sp_str=c('10200'),surv_id = c('47'),conn = akfin)
+
+```
+
+## Likelihood values
+
+```{r}
+base_like<-MyOutput$likelihoods_used %>% 
+  dplyr::rename(model_25.1 = values) %>%
+  dplyr::select(-lambdas) %>%
+  tibble::rownames_to_column(var = "component")
+
+all_like<-model_25.0$likelihoods_used %>% 
+  dplyr::rename(model_25.0 = values) %>%
+  dplyr::select(-lambdas) %>%
+  tibble::rownames_to_column(var = "component") %>%
+  dplyr::full_join(base_like)
+
+write.csv(all_like,file.path(compare_dir,"compare_likelihoods.csv"))
+
+```
+
+## Parameter tables
+
+Fs, rec devs, main parameters, selex parameters
+
+param values for a single run (also is with Time_Series_Param_Tables_2_Growth_Morphs.R):
+
+```{r}
+library(stringr)
+
+for (i in 1:length(the_run_list)) {
+the_run_pars<-data.frame(Label = the_run_list[[i]]$parameters$Label, Value = the_run_list[[i]]$parameters$Value, Phase = the_run_list[[i]]$parameters$Phase, StDev = the_run_list[[i]]$parameters$Parm_StDev)
+
+the_run_pars<-the_run_pars %>% mutate(model = the_run_labels[i])
+if (i == 1) {
+  base_pars_df <-the_run_pars
+} else {
+  base_pars_df<-base_pars_df %>% bind_rows(the_run_pars)
+}
+}
+# new_data_pars_df<-data.frame(Label = the_run_list[i]$parameters$Label, Value = MyOutput$parameters$Value, Phase = MyOutput$parameters$Phase, StDev = MyOutput$parameters$Parm_StDev)
+#   
+base_pars_df<-na.omit(base_pars_df[base_pars_df$Phase >0,])
+
+main_params_df<-base_pars_df %>% filter(!str_detect(Label, "^Early"),!str_detect(Label,"^Main"))
+
+pars_df<-main_params_df %>% 
+  mutate(area = case_when(str_detect(Label,"GP_2")==TRUE ~ "e",
+                               str_detect(Label,"GP_1")==TRUE ~ "wc",
+                               str_detect(Label,"Western") == TRUE ~"wc",
+                               str_detect(Label,"Eastern") == TRUE ~ "e",
+                               str_detect(Label,"Fishery") == TRUE ~ "wc",
+                               TRUE ~ "global"),
+         sex = case_when(str_detect(Label,"_Fem")==TRUE ~ "(f)",
+                         str_detect(Label,"_Mal") == TRUE ~"(m)",
+                         TRUE ~ "global")) %>%
+ # filter(!str_detect(Label,"Age")) %>% 
+  select(-c(Phase)) %>% 
+  mutate(Label = gsub("_GP_1", "", Label),Label = gsub("_GP_2","",Label),Label = gsub("_Fem","",Label),Label = gsub("_Mal","",Label),
+         Label= case_match(Label,"NatM_uniform" ~ "Natural mortality",
+                                 "L_at_Amin" ~ "Length at age 2",
+                                 "L_at_Amax" ~ "Length at age 20",
+                                 "VonBert_K" ~ "Von Bertalanffy k",
+                                 "CV_young" ~ "CV in length at age 2",
+                                 "CV_old" ~ "CV in length at age 20",
+                                 "RecrDist_area_2_month_1" ~ "Recruitment proportion to Eastern GOA",
+                           "SR_LN(R0)" ~ "Mean recruitment (log)",
+                           "LnQ_base_WesternCentralSurvey(2)" ~ "Catchability (log)",
+                           .default = Label)) 
+                           
+names(pars_df) <-c("parameter","est","stdev","model","area","sex")
+
+area_pars<-pars_df %>% filter(area !="global", sex!="global") %>%
+  mutate(parameter = paste(parameter,sex)) %>%
+  select(-sex) %>%
+  pivot_wider(id_cols = parameter,names_from = c(model,area),values_from = c(est,stdev)) 
+
+write.csv(area_pars,file.path(compare_dir,"area_specific_pars.csv"))
+
+
+#wc_bio_pars_df<-pars_df %>% filter(area == "wc")
+#e_bio_pars_df <-pars_df %>% filter(area == "e")
+global_bio_pars_df<-pars_df %>% filter(area == "global" | sex == "global") %>%
+  relocate(parameter) %>% 
+  select(-c(area,sex)) %>%
+  tidyr::pivot_wider(id_cols = parameter, names_from = model, values_from = c(est,stdev))
+write.csv(global_bio_pars_df,file.path(compare_dir,"global_and_selex_pars.csv"))
+
+
+RecPars.df<-data.frame(type = MyOutput$recruitpars$type, Yr = MyOutput$recruitpars$Yr, Value = MyOutput$recruitpars$Value, StDev = MyOutput$recruitpars$Parm_StDev)
+
+write.csv(RecPars.df,file = paste0(SS3PredDir,"RecPars.csv")) 
+write.csv(EstP.df,file = paste0(SS3PredDir,"Main_Pars.csv")) #easiest with fishing mortality to copy and paste straight from the report file.
+```
+
+### Time Series Tables
+
+Mostly I ran this file: "C:/GitProjects/newsbss/Process_SS_Output/Time_Series_Param_Tables_2_Growth_Morphs.R"
+
+```{r biomass_by_area_table}
+c<-MyOutput
+
+
+#area-specific total and spawning biomass
+gp2_bio_df<-c$timeseries %>% 
+  dplyr::filter(Yr>=FirstYr, Yr<=LastYr, Area==2) %>%
+  dplyr::select(Yr,'SmryBio_SX:1_GP:2','SpawnBio_GP:2')
+
+gp_bio_df<-c$timeseries %>% 
+  dplyr::filter(Yr>=FirstYr, Yr<=LastYr, Area==1) %>%
+  dplyr::select(Yr,'SmryBio_SX:1_GP:1','SpawnBio_GP:1') %>%
+  full_join(gp2_bio_df) %>%
+  rename(Year = Yr,tot_bio_wc = 'SmryBio_SX:1_GP:1',ssb_wc = 'SpawnBio_GP:1',tot_bio_e = 'SmryBio_SX:1_GP:2', ssb_e = 'SpawnBio_GP:2')
+
 
 ```
 
@@ -763,7 +1305,7 @@ No: 2. I had changed summary biomass to start at age 3 for this years runs. chan
 
 Next, I looked closely at the .dat file to see if it was right
 
-4\. Run old spm from 2021 with new base model (not easy because spm.exe was in the environment path on old computer and going further back I was running main.exe, and so couldn't run my make_exec function with that - too many changes in output organization)
+4.  Run old spm from 2021 with new base model (not easy because spm.exe was in the environment path on old computer and going further back I was running main.exe, and so couldn't run my make_exec function with that - too many changes in output organization)
 
 5.  *Cut recruitment in the projection .dat file in half, based on memory that at some point in the change to main/proj to spm versions, the spm.tpl code changed to assume that only female recruitment would be input, and it also assumes equal sex ratios at age of recruitment (here it's age 3), so it multiplies input recruitment by 2.*
 
@@ -786,7 +1328,7 @@ base_old_ss3_dir<-file.path(run_dir,"run_19_old_ss3")
 
 base_old_ss3_output = SS_output(dir = base_old_ss3_dir,covar = TRUE,forecast=TRUE,printstats=FALSE)
 
-AreaGrowthRex::get_projections(mydir = base_old_ss3_dir ,MyOutput = base_old_ss3_output,NagesProject = 20,FirstYr = 1982,LastYr = end_year,RecruitmentAge=3,species="Rex")
+AreaGrowthRex::get_projections(mydir = base_old_ss3_dir ,MyOutput = base_old_ss3_output,NagesProject = 20,FirstYr = 1982,LastYr = 2021,RecruitmentAge=3,species="Rex")
 SS_plots(replist = base_old_ss3_output,uncertainty=TRUE) 
 
 ```
@@ -817,99 +1359,3 @@ run_19_half_rec_dir<-file.path(run_dir,"run_19_divide_rec_in_half")
 run_19_half_rec_output<-SS_output(dir = run_19_half_rec_dir,covar = TRUE,forecast=TRUE,printstats=FALSE)
 
 ```
-
-### Apportionment
-
-Pull the akfin.gap_products.akfin_biomass_v table to get proportion by NMFS regulatory area, including W Yakutat and SE. Would be good to fit the get_spatial_biomass function into a package somewhere for this. There's AreaGrowthRex, rema, pull_gap_products (if it ends up as a package), survey_ISS, and then the goa_rex repo. Where should this go? And the fishery length comp code as well - it should come out of newsbbs and where should it go though?
-
-The views table has a column called nmfs_statistical_area that has the info to split by W Yak and SE outside.
-
-```{r get_spatial_biomass}
-source("C:/GitProjects/goa_rex/R/get_spatial_biomass.R", echo = TRUE)
-spatial_biomass_data<-get_spatial_biomass(srv_sp_str=c('10200'),surv_id = c('47'),conn = akfin) 
-
-spatial_biomass_data %>% distinct(nmfs_statistical_area)
-
-spatial_biomass_data %>% distinct(regulatory_area) %>%
-  filter(regulatory_area == "EASTERN GOA - NMFS") %>%
-  distinct(year)
-
-spatial_biomass_data %>% filter(nmfs_statistical_area=="West Yakutat District")
-
-```
-
-#-------------------------------------------------------------------- if (species=="Rex") { #for Rex: plot comparison of maturity curve and selex \# a50\<-5.62298 \# a95\<-10.3917 \# avec\<-3:20
-
-m.df\<-read.csv(file.path(WorkDir,"FlatfishAssessments","2017","Rex","Data","Maturity_At_Age_Buck.csv")) #m.df$est<-1/(1+exp(-log(19)/(a95-a50)*(avec-a50)))
-#stock synthesis selectivity:
-stuff<-MyOutput$ageselex\[MyOutput$ageselex$Factor == "Asel" & MyOutput$ageselex$Yr == 2021 & MyOutput$ageselex$Sex == 1 & MyOutput$ageselex$Fleet == 1,\] stuff2\<-stuff\[,-c(1:7)\] s.df\<-data.frame(Age = as.numeric(colnames(stuff2)), Sel = as.numeric(stuff2))
-
-plot(0,0,type = "n",bty = "l", xlim = c(0,max(s.df$Age)),ylim = c(0,1),xlab = "Age", ylab = "Proportion")
-lines(m.df$Age,m.df$Maturity,lwd = 3, lty = 1, col = "cadetblue")
-lines(s.df$Age,s.df\$Sel,lwd = 3, lty = 2, col = "black") legend(x = 13, y = 0.4,legend = c("Maturity","Selectivity (F)"),bty = "n",col = c("cadetblue","black"),lwd = c(3,3), lty = c(1,2))
-
-#save to same folder as for SS plots dev.copy(png,paste0(SS3PredDir,"Maturity_Selex.png")) dev.off() #--------------------------------------------------------------------- source(file.path(CodeDir,"Process_SS_Output","PlotMultipleGrowthMorphs.R")) #save to same folder as for SS plots PlotGrowth(DataDir = file.path(WorkDir,"FlatfishAssessments/2021/Rex/Data/Survey_Age_Length"),AgeLengthData = "Age_Length.csv")
-
-dev.copy(png,file.path(SS3PredDir,"plots","Growth_Curves.png")) dev.off()
-
-} #end if species=="Rex" #------------------------------------------------------------------------------ #check this plotting code - is this plotting dover age-lengths?? if (MyOutput\$ngpatterns == 1) { source(file.path(CodeDir,"Process_SS_Output","PlotSingleGrowthMorphGrowthCurve_And_Data.R")) #this line doesn't work - try C drive instead: dev.copy(png,paste0(redirect,"FlatfishAssessments\\",LastYr,"\\",species,"\\",SS3Folder,"Single_Morph_Growth_Curves.png")) dev.copy(png, "C:\\Data\\Single_Morph_Growth_Curves.png") dev.off() }
-
-#-------------------------------------------------------------------- \# #Tables of param values for a single run (also is with Time_Series_Param_Tables_2_Growth_Morphs.R):
-
-p1.df\<-data.frame(Label = MyOutput$parameters$Label, Value = MyOutput$parameters$Value, Phase = MyOutput$parameters$Phase, StDev = MyOutput$parameters$Parm_StDev)
-
-EstP.df\<-na.omit(p1.df\[p1.df\$Phase \>0,\])
-
-RecPars.df\<-data.frame(type = MyOutput$recruitpars$type, Yr = MyOutput$recruitpars$Yr, Value = MyOutput$recruitpars$Value, StDev = MyOutput$recruitpars$Parm_StDev)
-
-write.csv(RecPars.df,file = paste0(SS3PredDir,"RecPars.csv")) write.csv(EstP.df,file = paste0(SS3PredDir,"Main_Pars.csv")) #easiest with fishing mortality to copy and paste straight from the report file.
-
-#-----------------------------------------------------------------------------
-
-#--------------------------------------------------------------------- #BiasA = SS_fitbiasramp(replist = MyOutput) #Maybe write this to a file? #BiasA #------------------------------------------------------------
-
-#------------------------------------------------------------- #------------------------------------------------------------- #Do projections: #Write out the main projection input file #-------------------------------------------------------------- #before 2017: #source(paste0(redirect,"ProjectionModel\_",LastYr,"\\write_proj_ss_CRM_Dover.r"))
-
-#starting in 2017: #careful: this doesn't work with empirical weight-at-age output; need to manually insert maturity-at-age.
-
-if (species == "Rex" & MyOutput\$ngpatterns \> 1) { #NOTE: NAME ALL DATA FILES STARTING WITH "ForProjections" source(file.path(CodeDir,"Projections","write_proj_ss_CRM_2_growth_morphs.r")) write_proj(data_file=file.path(SS3PredDir,"ForProjections_GrowthMorph1.dat"),data=MyOutput,GrowthMorph=1,area =1,Narea = 2,Nmorph = 2,NAGES=NagesProject,FY=FirstYr,LY=LastYr,RecAge = RecruitmentAge,species = species) write_proj(data_file=file.path(SS3PredDir,"ForProjections_GrowthMorph2.dat"),data=MyOutput,GrowthMorph=2,area =2,Narea = 2,Nmorph = 2,NAGES=NagesProject,FY=FirstYr,LY=LastYr,RecAge = RecruitmentAge,species = species)
-
-} else { #NOTE: NAME ALL DATA FILES STARTING WITH "ForProjections" source(file.path(CodeDir,"Projections","write_proj_ss_CRM.r")) write_proj(data_file=file.path(SS3PredDir,"ForProjections.dat"),data=MyOutput,NAGES=NagesProject,FY=FirstYr,LY=LastYr,RecAge = RecruitmentAge,species = species)
-
-}
-
-#---------------------------------------------------------------------------- #Write a .bat file to run projections within a Projections folder within the run folder #This is handy if running projections for many runs. Otherwise maybe not worth it. #First need to go to FlatfishAssessments/Projections/RexTemplate and update all the files for the current year, including pulling any updates to main.tpl and recompiling. setwd(paste0(SS3PredDir)) data_file = "OrgProjections.bat" #line0\<-noquote(redirect) #write(line0,paste(data_file),ncolumns = 1) line1a\<-noquote(paste0("cd ",'"',SS3PredDir,'"')) write(line1a,paste(data_file),ncolumns = 1) \# myline \<- noquote("mkdir Projections\\data") \# write(myline,paste(data_file),ncolumns = 1, append = T)
-
-if (MyOutput\$ngpatterns ==2) { #NGrowthMorphs \>1 myline \<- noquote("mkdir Projections") write(myline,paste(data_file),ncolumns = 1, append = T)
-
-line2 \<-noquote(paste0("copy ",'"',WorkDir,"\\FlatfishAssessments\\ProjectionModel\\RexTemplate\\GrowthMorph1",'" "',SS3PredDir,"\\Projections\\GrowthMorph1",'"')) line2b \<-noquote(paste0("copy ",'"',WorkDir,"\\FlatfishAssessments\\ProjectionModel\\RexTemplate\\GrowthMorph2",'" "',SS3PredDir,"\\Projections\\GrowthMorph2",'"'))
-
-\# line2b \<-noquote(paste0("copy ",'"',WorkDir,"\\FlatfishAssessments\\ProjectionModel\\RexRunTemplate\\",'" "',SS3PredDir,"Projections\\GrowthMorph2",'"')) write(line2,paste(data_file),ncolumns =1,append = T ) write(line2b,paste(data_file),ncolumns =1,append = T )
-
-myline \<- noquote("mkdir Projections\\GrowthMorph1\\data") write(myline,paste(data_file),ncolumns = 1, append = T) myline2 \<- noquote("mkdir Projections\\GrowthMorph2\\data") write(myline2,paste(data_file),ncolumns = 1, append = T)
-
-line3\<-noquote(paste0("copy ForProjections_GrowthMorph1.dat ",'"',SS3PredDir,"\\Projections\\GrowthMorph1\\data\\ForProjections.dat",'"')) line3b\<-noquote(paste0("copy ForProjections_GrowthMorph2.dat ",'"',SS3PredDir,"\\Projections\\GrowthMorph2\\data\\ForProjections.dat",'"')) write(line3,paste(data_file),ncolumns =1,append = T ) write(line3b,paste(data_file),ncolumns =1,append = T )
-
-line4\<-noquote("cd Projections\\GrowthMorph1\\") write(line4,paste(data_file),ncolumns =1,append = T ) line5\<-noquote("main") write(line5,paste(data_file),ncolumns =1,append = T )
-
-preline\<-noquote("cd..") write(preline,paste(data_file),ncolumns =1,append = T ) line4b\<-noquote("cd GrowthMorph2\\") write(line4b,paste(data_file),ncolumns =1,append = T ) line5b\<-noquote("main") write(line5b,paste(data_file),ncolumns =1,append = T ) }
-
-if (MyOutput\$ngpatterns == 1) { myline \<- noquote("mkdir Projections\\data") write(myline,paste(data_file),ncolumns = 1, append = T) line2 \<-noquote(paste0("copy ",'"',redirect,"\\FlatfishAssessments\\",LastYr,"\\ProjectionModel\\",species,"RunTemplate\\",'" "',SS3PredDir,"Projections",'"'))
-
-write(line2,paste(data_file),ncolumns =1,append = T ) line3\<-noquote(paste0("copy ForProjections\* ",'"',SS3PredDir,"Projections\\data\\ForProjections.dat",'"')) write(line3,paste(data_file),ncolumns =1,append = T ) line4\<-noquote("cd Projections") write(line4,paste(data_file),ncolumns =1,append = T ) line5\<-noquote("main") write(line5,paste(data_file),ncolumns =1,append = T ) } #if NGrowthMorphs == 1 #\*\*\*\*RUN PROJECTIONS\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\* shell("OrgProjections")
-
-\`\`\`
-
-## Projections
-
-From ss3toProjecctTables: #CAUTION: for a 2-growth morph model a little help is needed for GP2 projections (GP1 projections are good): #you have to manually copy in the correct .dat file for the projections and change the sppcatch file to the correct GP2 catches
-
-#Before running the projection part of the code below do 2 manual steps: #1. update AK-projection-simulation repo (pull updates) #2. update the projection input files aside from the main (ForProjections) data file (these are in: #C:\Users\carey.mcgilliard\Work\FlatfishAssessments\ProjectionModel\RexTemplate) #Updating requires updated catches and updating the number of years of projections (14 for a full assessment year with a new data) and new catches and check \# years of catches input in proj input files #Probably worthwhile to check into whether it's better to run Jim's R code in AK-projection-simulation repo?? but the code below is for SS output) #Carey can never get Jim's newest projection code to run.
-
-#To: #1. plot SS results #2. Find Francis or McAllister and Ianelli Data weighting update values (for variance adjustments) #3. Plot fishery selex and maturity comparison for rex (as this was what made bio ref pts unreliable in the single area model - fishery selex way to right of maturity) #4. Plot growth data and estimated growth curves for both areas (uses AgeLength.csv, which was made earlier in newsbss/Inputs_PieceByPiece/Get_Survey_Length_Age_and_Plot.R) #5. Write .csv files for making parameter reporting tables #6. Write the projection input file to run folder (Careful: be sure to check over the projection file, especially female and male maturity) #(note writing directly to the run folder is meant to help prevent reporting an exec summary table for the wrong run and also helps when comparing projections for multiple runs) #7. Run projections: source("C:\\GitProjects\\newsbss\\Process_SS_Output\\SS3toProjectTables.R")
-
-#To make the executive summary table and harvest spec tables and do the required phase plot: source(C:\GitProjects\newsbss\Process\_SS_Output\ExecSummaryTable\_Phase_Plot_HarvestRecsTable.R)
-
-#To run retrospectives: #Make a new folder (Like Run_8_Retro), run the following (and this will plot the retros too): #change file paths and run folders source("C:\\GitProjects\\newsbss\\Process_SS_Output\\RunRetrospectives.R")
-
-#Compare any alternative runs using: #change file paths and run folders source("C:\\GitProjects\\newsbss\\Process_SS_Output\\CompareSS3Runs.R")

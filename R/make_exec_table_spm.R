@@ -5,18 +5,19 @@ library(tidyr)
 library(ggplot2)
 library(stringr)
 
-#' Title
+#' Make the executive summary table
 #'
 #' @param run_dir 
 #' @param endyr 
 #' @param the_scalar 
+#' @param alt alternative from spm that should be used for the executive summary table
 #'
 #' @return
 #' @export
 #'
 #' @examples
 #' make_exec_table(run_dir = "C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2025/rex_cie_review/runs/run11_as_for_7_est_male_m/Projections/GrowthMorph2" ,endyr = 2024, the_scalar = 1000)
-make_exec_table<-function(run_dir,endyr,the_scalar) {
+make_exec_table<-function(run_dir,endyr,the_scalar,alt=1) {
 
   bdf <- spmR::runSPM(run_dir,run=FALSE)
   df <- readr::read_csv(file.path(run_dir,"spm_summary.csv"))
@@ -29,7 +30,7 @@ make_exec_table<-function(run_dir,endyr,the_scalar) {
 
 
   #Build executive summary table:
-  stuff<-bdf %>% select(c(Year,Alt,Sim,SSB,F,Tot_biom,OFL,ABC)) %>% filter(Year == endyr+1 | Year==endyr+2,Alt==2) %>%
+  stuff<-bdf %>% select(c(Year,Alt,Sim,SSB,F,Tot_biom,OFL,ABC)) %>% filter(Year == endyr+1 | Year==endyr+2,Alt==alt) %>%
     group_by(Year,Alt) %>%
     summarize(meanTot_biom = mean(Tot_biom),meanSSB = mean(SSB),meanABC = mean(ABC),meanOFL=mean(OFL))
 
