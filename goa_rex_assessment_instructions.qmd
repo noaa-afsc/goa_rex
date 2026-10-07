@@ -10,6 +10,13 @@ editor: visual
 ## Make some directories to use throughout
 
 ```{r make_directories}
+#switches
+ms_or_present = "ms" # "present"
+do_jitters = "FALSE" #TRUE
+do_retros = "FALSE" #TRUE
+do_projections = "FALSE" #TRUE
+do_five_yr_table = "FALSE" #TRUE
+
 #Directories used
 past_proj_dir<-"C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2024/rex/harvest_projections"
 DataDir = "C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2026/goa_rex/data/"
@@ -83,7 +90,7 @@ label_18 <- "new data"
 label_base <-"base model"
 label_20<-"mid-year survey timing"
 the_run_labels <-c(label_2021,label_18,label_base)
-the_run_labels_20<-c(label_base,label_20)
+#the_run_labels_20<-c(label_base,label_20)
 ```
 
 ## Read in libraries
@@ -385,6 +392,7 @@ dev.copy(pdf,'plots/SSplotPars.pdf')
 dev.off()
 
 ```
+
 ```{r}
 source("C:/GitProjects/goa_rex/R/write_proj_ss_CRM_2_growth_morphs_and_SARA.r", echo = TRUE)
 
@@ -418,6 +426,7 @@ write_proj(data_file=file.path(run_18,"ForProjections_GrowthMorph2.dat"),
                      SSversion = "SS-V3.30")
 
 ```
+
 Make the working directory for saving things SS3PredDir until further notice
 
 \#`{r change_wd_to_current_run} ##| label: setup ##| include: false #knitr::opts_knit$set(root.dir = SS3PredDir) #`
@@ -428,6 +437,7 @@ The jitter analysis starts with a jitter fraction of 0.1 and 100 runs. - Converg
 - Global vs. Local: If many runs find a likelihood lower than your original base model, your original model was stuck in a local minimum. You should adopt the parameter file from the lower likelihood run as your new base. \### Copy the files for jittering
 
 ```{r copy_files_for_jittering}
+if (do_jitters) {
 #
 # 1. Define directory paths and settings
 # Core directory containing your base model files
@@ -444,6 +454,7 @@ r4ss::copy_SS_inputs(
   overwrite = TRUE,
   verbose = TRUE
 )
+}
 ```
 
 ### Do the jitter analysis
@@ -453,32 +464,38 @@ One note is that the jitter fraction in the starter file in the run folder for j
 **This section including the call to the jitter() function is commented out so as to not accidentally start 500 jitters by pushing the Render button**
 
 ```{r jitter_analysis}
+if (do_jitters) {
+
 ## 3. Execute the jitter loop
 # This function automatically modifies starter.ss and runs SS3
 
 
-# jitter_results <- r4ss::jitter(
-#   dir = jitter_dir,            # Directory with model files
-#   Njitter = 500,               # Number of random trials (100+ is standard)
-#   jitter_fraction = 0.1,        # Your chosen reasonable jitter fraction
-#   init_values_src = 0,         # 0 = start each run from the init values in control file
-#   printlikes = TRUE,            # Prints likelihoods to console during runs
-#   exe = "ss3_win"
-# )
+ jitter_results <- r4ss::jitter(
+   dir = jitter_dir,            # Directory with model files
+   Njitter = 500,               # Number of random trials (100+ is standard)
+   jitter_fraction = 0.1,        # Your chosen reasonable jitter fraction
+   init_values_src = 0,         # 0 = start each run from the init values in control file
+   printlikes = TRUE,            # Prints likelihoods to console during runs
+   exe = "ss3_win"
+ )
 
 ## 4. Analyze the results
 ## Print a summary of the negative log-likelihoods across all runs
 
-#print(jitter_results)
+print(jitter_results)
 
 # Count how many runs successfully converged to the global minimum
 # (Assuming the lowest value in the vector is the global minimum)
-#global_min <- min(jitter_results, na.rm = TRUE)
-#success_count <- sum(jitter_results == global_min, na.rm = TRUE)
+global_min <- min(jitter_results, na.rm = TRUE)
+success_count <- sum(jitter_results == global_min, na.rm = TRUE)
 
-#cat("Global minimum likelihood found:", global_min, "\n")
-#cat("Number of runs that converged to this minimum:", success_count, "out of", #length(jitter_results), "\n")
+cat("Global minimum likelihood found:", global_min, "\n")
+cat("Number of runs that converged to this minimum:", success_count, "out of", length(jitter_results), "\n")
 
+write.csv(jitter_results,file.path(jitter_dir,"jitter_results.csv"))
+write.csv(global_min,file.path(jitter_dir,"jitter_global_min.csv"))
+write.csv(success_count,file.path(jitter_dir,"jitter_success_count.csv"))
+}
 ```
 
 #### Summary of 2026 jitter runs:
@@ -552,13 +569,29 @@ the_run_labels[1] <-"accepted_model"
 write.csv(summary_run_list_20$pars,file = file.path(compare_19_20,"ParComparison.csv"))
 ```
 
-### Plots comparing time-series estimates
+### Plots comparing time-series estimates - manuscript fonts
 
 ```{r plot estimated pop dynamics, echo = FALSE, message = FALSE, warning = FALSE, fig.cap = "Figure 6. Observed catches and estimated spawning biomass, recruitment, and fishing intensity (1-spawning potential ratio) for each of the four alternative models with new data added"}
 
+if (ms_or_present == "ms") {
+  
+# Manuscript theme
+.THEME <- theme(panel.grid.major.x = element_blank(), panel.grid.minor.y = element_blank(), panel.grid.major.y = element_blank() )
+.THEME <- .THEME + theme(text=element_text(size=12)) + theme(axis.title.x=element_text(size=12) ,axis.title.y=element_text(size=12, angle = 90,vjust = +2)) +
+theme(legend.position = "bottom")
+theme_set(.THEME)
+} else {
+# Presentation theme
+.THEME <- theme(panel.grid.major.x = element_blank(), panel.grid.minor.y = element_blank(), panel.grid.major.y = element_blank() )
+.THEME <- .THEME + theme(text=element_text(size=18)) + theme(axis.title.x=element_text(size=24) ,axis.title.y=element_text(size=24, angle = 90,vjust = +2)) +
+theme(legend.position = "bottom")
+theme_set(.THEME)
+  
+}
+
 #need ssbplot for the base case for stock assessment guidelines
 ssb_base_plot<-AreaGrowthRex::plot_ssbs(ssruns = the_run_list[3], mlabel = the_run_labels[3], showxlabel = TRUE, showlegend = "yes",color_option = "cividis",color_direction =1)
-ggplot2::ggsave(filename = file.path(run_base,"plots",paste0("ssb_base_case.png")),plot = ssb_base_plot)
+ggplot2::ggsave(filename = file.path(run_base,"plots",paste0("ssb_base_case_",ms_or_present,".png")),plot = ssb_base_plot)
 
 #need to make y-axis on ssb go to zero
 ssbplot<-AreaGrowthRex::plot_ssbs(ssruns=the_run_list,mlabel=the_run_labels,showxlabel =   FALSE,showlegend = "none",color_option = "cividis",color_direction =-1)
@@ -574,7 +607,7 @@ total_catch_plot<-AreaGrowthRex::plot_total_catch(ssruns = the_run_list,mlabel =
 #from library(patchwork)
 bigfig<-(total_catch_plot/ssbplot/recplot/fi_plot)
 
-ggplot2::ggsave(filename = file.path(compare_dir,paste0("compare_time_series.png")),plot=bigfig,device = "png",width = 8.5,height = 11)
+ggplot2::ggsave(filename = file.path(compare_dir,paste0("compare_time_series_ms_",ms_or_present,".png")),plot=bigfig,device = "png",width = 8.5,height = 11)
 
 bigfig
 ```
@@ -585,7 +618,7 @@ bigfig
 
 p<-AreaGrowthRex::compare_index_fits(ssruns = the_run_list,mlabels=the_run_labels)
 p
-ggplot2::ggsave(filename = file.path(compare_dir,"index_fits_all_models.png"),device = "png",width = 10, height = 7)
+ggplot2::ggsave(filename = file.path(compare_dir,paste0("index_fits_all_models_",ms_or_present,".png")),device = "png",width = 10, height = 7)
 ```
 
 ### Plots comparing fits to growth data
@@ -602,7 +635,7 @@ specimen_data<-read.csv(file.path(data_dir,"survey_spatial_specimen_data.csv")) 
 
 g<-AreaGrowthRex::plot_growth(ssruns=the_run_list,sslabels=the_run_labels,thedata= specimen_data, savePlot = FALSE)
 g
-ggplot2::ggsave(filename = file.path(compare_dir,"Plot_Growth_AllModels.png"),device = "png",width = 10,height = 5)
+ggplot2::ggsave(filename = file.path(compare_dir,paste0("Plot_Growth_AllModels_",ms_or_present,".png")),device = "png",width = 10,height = 5)
 
 ```
 
@@ -611,25 +644,27 @@ Plot selectivity and maturity
 ```{r plot selectivity overlaid on maturity, echo = FALSE, message = FALSE, warning = FALSE, fig.cap = "Figure 7. Fishery and survey selectivity-at-age across models for males and females. Plots for females are overlaid on maturity-at-age"}
 p<-AreaGrowthRex::plot_selex_maturity(ssruns=the_run_list,mlabels=the_run_labels) 
 p
-ggplot2::ggsave(filename = file.path(compare_dir,paste0("Plot_Selex_Maturity_AllModels.png")),device = "png",width = 10,height = 7)
+ggplot2::ggsave(filename = file.path(compare_dir,paste0("Plot_Selex_Maturity_AllModels_",ms_or_present,".png")),device = "png",width = 10,height = 7)
 ```
 
 Plot length comps for two-area models. What about the survey lengths from the eastern GOA? Need to work on this plot as these are not included.
 
 ```{r plot length comps two area models, echo = FALSE, message = FALSE, warning = FALSE, fig.cap = "Figure 4. Fits (lines) to female and male fishery length composition with data aggregated by year (shaded regions) for the two-area area model."}
-q<-AreaGrowthRex::plot_comps_twoarea(ssruns = the_run_list, narea = 2, mnames = the_run_labels,comptype = "length")
+q<-AreaGrowthRex::plot_comps_twoarea(ssruns = the_run_list, narea = 1, mnames = the_run_labels,comptype = "length")
 q$combo
-ggplot2::ggsave(filename = file.path(compare_dir,paste0("Agg_fits_length_comps_all_models.png")),q$combo,device = "png",width = 10,height = 7)
+ggplot2::ggsave(filename = file.path(compare_dir,paste0("Agg_fits_length_comps_wc_all_models_",ms_or_present,".png")),q$combo,device = "png",width = 10,height = 7)
 
+qq<-AreaGrowthRex::plot_comps_twoarea(ssruns = the_run_list,narea = 2,mnames = the_run_labels,comptype = "length")
+ggplot2::ggsave(filename = file.path(compare_dir,paste0("Agg_fits_length_comps_e_all_models_",ms_or_present,".png")),qq$combo,device = "png",width = 10,height = 7)
 ```
 
 ```{r plot fishery ages two area models, echo = FALSE, message = FALSE, warning = FALSE, fig.cap = "Figure 5. Fits (lines) to female and male fishery age composition with data aggregated by year (shaded regions) for the two-area area model with fishery ages included in model inputs."}
 
-qq<-AreaGrowthRex::plot_comps_twoarea(ssruns = the_run_list, narea = 2, mnames = the_run_labels,comptype = "age")
+qq<-AreaGrowthRex::plot_comps_twoarea(ssruns = the_run_list, narea = 1, mnames = the_run_labels,comptype = "age")
 
 qq$combo
 
-ggplot2::ggsave(filename = file.path(compare_dir,paste0("Agg_fits_age_comps_all_models.png")),plot = qq$combo,device = "png",width = 10,height = 7)
+ggplot2::ggsave(filename = file.path(compare_dir,paste0("Agg_fits_age_comps_wc_all_models_",ms_or_present,".png")),plot = qq$combo,device = "png",width = 10,height = 7)
 ```
 
 ### Some tables
@@ -645,7 +680,7 @@ write.csv(compare_params,file.path(compare_dir,"compare_time_inv_params.csv"))
 doRetros is deprecated and there was a bug in 3.30.01. The code below is used but is commented out so that a long process does not start by pressing Render.
 
 ```{r run_retrospectives}
-
+if (do_retros) {
 # # New directory where jitter runs will be executed
  NRetro = 10
  retro_dir <- file.path(run_dir,"run_19_retro_runs") 
@@ -661,12 +696,14 @@ r4ss::copy_SS_inputs(
 
 future::plan(strategy = "multicore")
 retros<-retro(dir = retro_dir, years = 0:-NRetro, exe = "ss3_win")
-
+}
 ```
 
 ### Plot retrospectives
 
 ```{r plot retrospective population dynamics, echo = FALSE, message = FALSE, warning = FALSE, fig.cap = "Figure 6. Observed catches and estimated spawning biomass, recruitment, and fishing intensity (1-spawning potential ratio) for the retrospective runs"}
+
+if (do_retros) {
 NRetro = 10
 the_retro_dirs=c(file.path(retro_dir,"retrospectives",paste("retro",1:NRetro,sep="-")),file.path(retro_dir,"retrospectives","retro0"))
 the_retro_labels <-c(paste0("retro ",-1:-NRetro),"base model")
@@ -697,12 +734,17 @@ mohn<-r4ss::SSmohnsrho(retroSummary, endyrvec, verbose = TRUE)
 
 mohn_df<-tibble(ssb = mohn$AFSC_Hurtado_SSB, recruitment = mohn$AFSC_Hurtado_Rec, fishing_mortality = mohn$AFSC_Hurtado_F, bratio = mohn$AFSC_Hurtado_Bratio)
 
-write.csv(mohn_df,file = file.path(compare_dir,"afsc_hurtado_mohn.csv"))
+write.csv(mohn_df,file = file.path(retro_compare_dir,"afsc_hurtado_mohn.csv"))
+}
 ```
 
 ### Phase plot
 
+Didn't get to this
+
 ### Do OSA residuals
+
+Didn't get to this
 
 ### Do the projections
 
@@ -793,7 +835,7 @@ fixed_catch\
 
 #### make the .dat files
 
-I think there is a problem here where spm.tpl was changed and something (recruitment?) might need to be doubled when making these .dat files. I will check into it tonight.
+The first thing to check for if spm produces wonky results is whether the code that made the projection input file puts in total recruits instead of total recruits/2 (older code will do total recruits and newer spm code needs 1/2\*total recruits!)
 
 ```{r write_projection_dat_file}
 
@@ -814,7 +856,7 @@ Most of the run directories are specified in the chunk @organize_comparisons
 
 ```{r}
 #| label: organize_projections
-
+if (do_projections) {
 
 #the_proj_dirs<-c(base_old_ss3_dir) #for troubleshooting, start below
 #the_proj_dirs<-(c(age0_smry_bio_dir)) #for troubleshooting, start below
@@ -880,7 +922,7 @@ for (i in seq_along(the_proj_dirs)) {
     overwrite = TRUE
   )
 }
-
+}
 ```
 
 **Now check the actual files to make sure everything looks right!**
@@ -905,6 +947,8 @@ spmR works best by cloning the repo and compiling spm.tpl yourself, putting it i
 
 ```{r}
 #| label: make_exec_summary_tables
+
+if (do_projections) {
  #source("C:/GitProjects/spmR/R/make_tier3a_exec_table.R", echo = TRUE)
 source("C:/GitProjects/spmR/R/make_tier3a_exec_table.R", echo = TRUE)
 
@@ -925,18 +969,19 @@ str(e_proj_detail)
 
 e_exec[i]<-make_tier3a_exec_table(e_proj_dir[i],endyr=end_year_vec[i],the_scalar=1000)
 }
-
+}
 ```
 
 Make the scenario projection tables
 
 ```{r make_scenario_projection tables}
-
+if (do_projections) {
 proj_catches_wc<-scenario_tables(proj_dir = wc_proj_dir[[2]],
                                  spm_detail_df = wc_proj_detail[[i]],the_scalar = 1000)
 
 proj_catches_e<-scenario_tables(proj_dir = e_proj_dir[[2]],
                                  spm_detail_df = e_proj_detail[[i]],the_scalar = 1000)
+}
 ```
 
 ### 5 year projections
@@ -952,31 +997,17 @@ Scenario 3 is: In all future years, F is set equal to 50% of max FABC. (Rational
 The projection model runs for 5 year table: Alt 3
 
 ```{r five_year_projections_part_1}
+if (do_five_yr_table) {
 source("C:/GitProjects/goa_rex/R/five_year_hp_table.R", echo = TRUE)
 
 #these are the 5-year projection tables, except that ABC is wrong.
 wc_five_year_alt_3_df<-five_year_hp_table(hp_dir =wc_five_year_proj ,current_year = year(today()),alt = 3)
 
 e_five_year_alt_3_df<-five_year_hp_table(hp_dir =e_five_year_proj ,current_year = year(today()),alt = 3) # %>%  dplyr:: mutate(mean_catch = as.character(mean_catch),mean_catch = if_else(Year > 2028, "C", mean_catch))
-
+}
 ```
 
-<!-- The second projection model run to get the right ABCs for the 5-year projection table. -->
-
-<!-- Now take the catches that come from running with Alt = 3 and put them in spm.dat (manually) and re-run spm in a new folder (manually). Then re-make the five-year projection tables using Alt 1 to get the right ABC that goes along with catches that come from the fixed F (alt 3) run. -->
-
-<!-- ```{r five_year_projections_final} -->
-<!-- source("C:/GitProjects/goa_rex/R/five_year_hp_table.R", echo = TRUE) -->
-
-<!-- #these are the 5-year projection tables, except that ABC is wrong. -->
-<!-- wc_five_year_ABC_df<-five_year_hp_table(hp_dir =wc_five_year_proj_ABC ,current_year = year(today()),alt = 1) -->
-
-<!-- e_five_year_ABC_df<-five_year_hp_table(hp_dir =e_five_year_proj_ABC ,current_year = year(today()),alt = 1) # %>%  dplyr:: mutate(mean_catch = as.character(mean_catch),mean_catch = if_else(Year > 2028, "C", mean_catch)) -->
-
-
-<!-- ``` -->
-
-### Apportionment
+### BRDs
 
 Pull the akfin.gap_products.akfin_biomass_v table to get proportion by NMFS regulatory area, including W Yakutat and SE. Would be good to fit the get_spatial_biomass function into a package somewhere for this. There's AreaGrowthRex, rema, pull_gap_products (if it ends up as a package), survey_ISS, and then the goa_rex repo. Where should this go? And the fishery length comp code as well - it should come out of newsbbs and where should it go though?
 
@@ -1038,18 +1069,13 @@ e_area_proportions<-e_output$proportion_biomass_by_strata %>% filter(year==2025)
 write.csv(e_output$proportion_biomass_by_strata,file = file.path(data_dir,"e_rema_proportions.csv"))
 ```
 
-Long projection tables
-
-```{r}
-
-
-```
+I did the rest of the BRD process in Excel using the e_rema_proportions.csv information (see the BRD table in the GOA rex doc, and the Excel table is at: "C:/Users/carey.mcgilliard/Work/FlatfishAssessments/2026/goa_rex/writeup/tables/2026_ExecSummaryTable4_AreaApportionment_ABCs.csv")
 
 ## Making survey cpue maps
 
-Matt Callahan made these for me. They come from this code:
+Matt Callahan made these for me. They come from this code: https://github.com/MattCallahan-NOAA/gapproductssynopsis
 
-Kalei says Matt used to make IDW maps (inverse weighted distance), but the survey group mentioned that they are innappropriate for GOA/AI survey data and for much marine ecological data. Kalei asked gemini why that would be a bad method and this is what it said:\
+Notes: Kalei says Matt used to make IDW maps (inverse weighted distance), but the survey group mentioned that they are innappropriate for GOA/AI survey data and for much marine ecological data. Kalei asked gemini why that would be a bad method and this is what it said:\
 "Yes, using Inverse Distance Weighting (IDW) to interpolate Catch Per Unit Effort (CPUE) haul data, as seen in "Screenshot 2026-08-27 161053.png" for shortraker rockfish in the Aleutian Islands, is generally considered inappropriate for marine ecological data.\
 While IDW is easy to compute and visually striking, its underlying mathematical assumptions conflict with the biological realities of how marine species are distributed. Here are the primary reasons why this method falls short for this type of fisheries data:\
 **Ignores Depth and Habitat Boundaries:** IDW calculates values based purely on 2D geographic distance. It assumes that if you have a high catch at Point A, a location physically close to it (Point B) should also have a high catch. However, marine environments—especially in the Aleutian Islands—feature steep drop-offs and complex bathymetry. Point A might be at an optimal depth of 300 meters, while Point B, just a mile away, might be in a 2,000-meter trench or on a shallow reef. IDW will incorrectly interpolate high biomass across these entirely different habitats.\
@@ -1059,18 +1085,6 @@ While IDW is easy to compute and visually striking, its underlying mathematical 
 **Better Alternatives**\
 For data like this, fisheries scientists typically use model-based approaches that account for environmental covariates and spatial autocorrelation. Vector Autoregressive Spatio-Temporal (VAST) models, Generalized Additive Models (GAMs), or Kriging with external drift are standard because they allow bathymetry and habitat types to constrain the interpolation, resulting in maps that actually reflect the species' ecology."\
 so I guess it's not good to use that method for various reasons, so he used the plotting function and made points weighted by cpue. it's just really hard to see patterns that way, but is what it is
-
-### Time series and other plots and tables for the base case run (MyOutput)
-
-```{r}
-setwd(run_base)
-MyOutput = SS_output(dir = run_base,covar = Uncertainty,forecast=TRUE,printstats=FALSE)
-
-
-
-
-
-```
 
 ### Fishery tables
 
@@ -1272,11 +1286,13 @@ write.csv(RecPars.df,file = paste0(SS3PredDir,"RecPars.csv"))
 write.csv(EstP.df,file = paste0(SS3PredDir,"Main_Pars.csv")) #easiest with fishing mortality to copy and paste straight from the report file.
 ```
 
-### Time Series Tables
+### Time series and other stuff
 
-Mostly I ran this file: "C:/GitProjects/newsbss/Process_SS_Output/Time_Series_Param_Tables_2_Growth_Morphs.R"
+Mostly I ran this file: "C:/GitProjects/newsbss/Process_SS_Output/Time_Series_Param_Tables_2_Growth_Morphs.R" and updated the top to be the right run.
 
 ```{r biomass_by_area_table}
+setwd(run_base)
+MyOutput = SS_output(dir = run_base,covar = Uncertainty,forecast=TRUE,printstats=FALSE)
 c<-MyOutput
 
 
@@ -1290,11 +1306,9 @@ gp_bio_df<-c$timeseries %>%
   dplyr::select(Yr,'SmryBio_SX:1_GP:1','SpawnBio_GP:1') %>%
   full_join(gp2_bio_df) %>%
   rename(Year = Yr,tot_bio_wc = 'SmryBio_SX:1_GP:1',ssb_wc = 'SpawnBio_GP:1',tot_bio_e = 'SmryBio_SX:1_GP:2', ssb_e = 'SpawnBio_GP:2')
-
-
 ```
 
-### Troubleshooting projections
+### Troubleshooting projections (this is probably not necessary to keep, but for the record)
 
 The models are nearly identical and the projections are quite different, so something is going wrong. Here are the experiments I'm doing:\
 No: 1. Ran the new base case (run_19) with an old version of ss3 and then doing projections with current spmR to see if something changed in Report.sso that has impacted the data input file for spmR
@@ -1319,43 +1333,4 @@ Next, I looked closely at the .dat file to see if it was right
       // AMeanRec(ispp) = mean(R(ispp));  // Arithmetic mean, converted to females (half) later
     ```
 
-The solution is to fix this in the AreaGrowthRex package under R/write_proj_ss_2Area.R and R/write_proj_ss_1Area.R by either only entering female recruits or by dividing in half prior to writing it out.
-
-The following troubleshooting runs for projections required running the little chunks below and then going further up in the code to @organize_projections to set the_proj_dirs to each of these dirs, and running that @organize_projections and then subequently @make_exec_summary_tables, pointing to the usefulness of making those chunks into functions for next time.
-
-```{r troubleshoot projections}
-base_old_ss3_dir<-file.path(run_dir,"run_19_old_ss3")
-
-base_old_ss3_output = SS_output(dir = base_old_ss3_dir,covar = TRUE,forecast=TRUE,printstats=FALSE)
-
-AreaGrowthRex::get_projections(mydir = base_old_ss3_dir ,MyOutput = base_old_ss3_output,NagesProject = 20,FirstYr = 1982,LastYr = 2021,RecruitmentAge=3,species="Rex")
-SS_plots(replist = base_old_ss3_output,uncertainty=TRUE) 
-
-```
-
-```{r troubleshoot summary biomass}
-age0_smry_bio_dir<-file.path(run_dir,"run_19_smry_biomass_age_0")
-age0_smry_bio_output<-SS_output(dir = age0_smry_bio_dir,covar = TRUE,forecast=TRUE,printstats=FALSE)
-
-AreaGrowthRex::get_projections(mydir = age0_smry_bio_dir ,MyOutput = age0_smry_bio_output,NagesProject = 20,FirstYr = 1982,LastYr = end_year,RecruitmentAge=3,species="Rex")
-```
-
-```{r troubleshoot 2021 projections}
-run_2021_new_ss3_dir<-file.path(run_dir,"run_2021_accepted_new_ss3v")
-run_2021_new_ss3_output<-SS_output(dir = run_2021_new_ss3,covar = TRUE,forecast=TRUE,printstats=FALSE)
-
-AreaGrowthRex::get_projections(mydir = run_2021_new_ss3_dir ,MyOutput = run_2021_new_ss3_output,NagesProject = 20,FirstYr = 1982,LastYr = end_year,RecruitmentAge=3,species="Rex")
-```
-
-```{r troubleshoot spm version}
-run_19_old_spm_dir<-file.path(run_dir,"run_19_old_spm")
-run_19_old_spm_output<-SS_output(dir = run_19_old_spm_dir,covar = TRUE,forecast=TRUE,printstats=FALSE)
-
-AreaGrowthRex::get_projections(mydir = run_19_old_spm_dir,MyOutput = run_19_old_spm_output,NagesProject = 20,FirstYr = 1982,LastYr = end_year,RecruitmentAge=3,species="Rex")
-```
-
-```{r divide recruitment in half}
-run_19_half_rec_dir<-file.path(run_dir,"run_19_divide_rec_in_half")
-run_19_half_rec_output<-SS_output(dir = run_19_half_rec_dir,covar = TRUE,forecast=TRUE,printstats=FALSE)
-
-```
+The solution is to fix this in the AreaGrowthRex package under R/write_proj_ss_2Area.R and R/write_proj_ss_1Area.R by either only entering female recruits or by dividing in half prior to writing it out, which I have done. It's fixed.
